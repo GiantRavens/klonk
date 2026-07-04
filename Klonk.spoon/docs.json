@@ -1,0 +1,53 @@
+[
+  {
+    "Constant": [],
+    "Variable": [
+      {
+        "name": "soundDirs",
+        "def": "Klonk.soundDirs",
+        "doc": "List of directories scanned for sound sets. Set before :start() to customize. Defaults to the bundled sounds/ plus ~/.klonk/sounds. Earlier directories win.",
+        "type": "Variable"
+      }
+    ],
+    "Method": [
+      {
+        "name": "start",
+        "def": "Klonk:start()",
+        "doc": "Installs the menu-bar item and the keystroke listener, restoring the last set / volume / on-state.",
+        "type": "Method"
+      },
+      {
+        "name": "stop",
+        "def": "Klonk:stop()",
+        "doc": "Removes the menu-bar item and stops listening.",
+        "type": "Method"
+      },
+      {
+        "name": "toggle",
+        "def": "Klonk:toggle()",
+        "doc": "Toggles keystroke sounds on/off.",
+        "type": "Method"
+      },
+      {
+        "name": "cycleSet",
+        "def": "Klonk:cycleSet(step)",
+        "doc": "Switches to the next (step 1) or previous (step -1) sound set.",
+        "type": "Method"
+      },
+      {
+        "name": "bindHotkeys",
+        "def": "Klonk:bindHotkeys(mapping)",
+        "doc": "Binds hotkeys. Keys: toggle, nextSet, prevSet.",
+        "type": "Method"
+      }
+    ],
+    "Function": [],
+    "Command": [],
+    "Constructor": [],
+    "Deprecated": [],
+    "name": "Klonk",
+    "desc": "Mechanical keystroke sounds for macOS — any sound set is a folder of WAVs.",
+    "doc": "Mechanical keystroke sounds for macOS, in any voice you like. A sound set is just a folder of WAVs, so synthesized sets, real recorded keyboards, and anything you drop in all play the same way. Every set rings a Return ding baked into its own enter.wav. Menu-bar controlled.",
+    "items": []
+  }
+]
