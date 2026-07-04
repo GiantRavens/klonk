@@ -190,6 +190,12 @@ with tempfile.TemporaryDirectory() as tmp:
         if s: write_wav(name, s)
     write_wav("enter.wav", mix(key_samples(28) or [], load_bell()))   # click + typewriter bell
 
+    # Pin polyphony to a single voice: a real mechanical keyboard is crisp —
+    # each keystroke a discrete clack, not a ringing sample that should layer
+    # into a wash. This opts the set out of klonk's length-based voice heuristic.
+    with open(os.path.join(out, "voices"), "w") as f:
+        f.write("1\n")
+
     with open(os.path.join(out, "SOURCE.txt"), "w") as f:
         f.write(f"Set '{setname}' imported from Mechvibes pack '{pack}' ({dtype})\n"
                 f"{REPO}/{pack}/\nLicense: MIT (github.com/hainguyents13/mechvibes)\n"

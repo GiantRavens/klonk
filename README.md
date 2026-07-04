@@ -7,6 +7,15 @@ item. A *sound set* is just a folder of WAVs, so the eleven built-in synthesized
 sets, real recorded keyboards, and anything you drop in all play the same way.
 Every set rings a Return "ding" baked into its own `enter.wav`.
 
+**Mouse clicks and scrolling ring too.** A click is mechanically just a
+down-then-up, so every set voices the mouse for free from its `down`/`up` pool —
+no new files needed. Trackpad scroll and the wheel tick as you scroll (throttled,
+and silent during inertial coasting). A **Mouse clicks** menu toggle turns it
+on/off independently of the keyboard. macOS reports a trackpad tap and a physical
+mouse click identically, so both are covered by the same click sound; a set can
+ship dedicated `click` / `clickup` / `rightclick` / `scroll` WAVs to give the
+mouse its own voice.
+
 ▶️ **[Try it in your browser](previews/gallery.html)** — pick a set and type; it runs
 the same logic client-side, no install.
 
@@ -29,9 +38,10 @@ spoon.Klonk:start()
 
 -- optional hotkeys
 spoon.Klonk:bindHotkeys({
-  toggle  = {{"cmd", "alt"}, "k"},   -- mute/unmute
-  nextSet = {{"cmd", "alt"}, "]"},   -- next set
-  prevSet = {{"cmd", "alt"}, "["},   -- previous set
+  toggle      = {{"cmd", "alt"}, "k"},   -- mute/unmute everything
+  toggleMouse = {{"cmd", "alt"}, "m"},   -- mute/unmute mouse clicks + scroll
+  nextSet     = {{"cmd", "alt"}, "]"},   -- next set
+  prevSet     = {{"cmd", "alt"}, "["},   -- previous set
 })
 ```
 
@@ -63,10 +73,41 @@ sets…** opens it). The naming convention:
 down1.wav … downN.wav    generic key-down (a random one plays per key)
 up1.wav   … upN.wav       key-up / release
 space.wav  enter.wav  backspace.wav    dedicated keys
+click1.wav … clickN.wav  mouse-down    (optional; falls back to down)
+clickup.wav rightclick.wav             (optional; fall back to up / click)
+scroll1.wav … scrollN.wav mouse wheel / trackpad scroll tick (optional → up)
 ```
 
 Any subset works — klonk plays whatever's present. `enter.wav` is your Return
-ding, so give it some ring.
+ding, so give it some ring. Omit the mouse files and a click simply reuses your
+`down`/`up` sounds.
+
+## Build a set from any samples
+
+Got a folder of one-shot recordings — paper crinkles, ping-pong bounces, sparks,
+console blips? `tools/make_set.py` slices, trims, normalizes, and maps them onto
+the whole convention (keys **and** mouse voices) in one shot:
+
+```sh
+python3 tools/make_set.py ~/sounds/paper paper              # -> ~/.klonk/sounds/paper
+python3 tools/make_set.py ~/trek lcars --enter "Working.m4a" --space "Door Chime.aif"
+```
+
+It **prints a manifest first** — every input's duration and attack, then which
+source landed on which role — so you see its decisions before trusting the audio.
+`--enter FILE` / `--space FILE` pin a semantic sound to a key (and keep it out of
+the random keystroke pool, so a door chime doesn't fire on every letter). Short
+samples become keys and clicks; the fullest becomes space/enter. Needs `ffmpeg`.
+Output lands in your personal dir, never the repo.
+
+## Ambient beds
+
+klonk can also play a **looping background soundscape** under your typing — pick
+one from the menu-bar **Ambient** submenu (with its own bed volume). Three CC0
+beds ship synthesized: `rain`, `wind`, `surf`. Drop your own long, loopable audio
+into `~/.klonk/ambient/<name>.wav` (waves, a thunderstorm, a starship bridge hum)
+and it joins the list. Beds are independent of the keystroke switch and resume
+across restarts.
 
 ## Real recorded keyboards
 
@@ -113,6 +154,19 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
 - **Mechanical vs. digital.** The `telegraph`/`manual` sets use a broadband
   impact + a low body tone that *sags in pitch* as it decays + soft saturation —
   the three things clean sine partials can't fake.
+- **Voices layer, adaptively.** A single `hs.sound` is monophonic — retriggering
+  it cuts its own tail — so each sound is loaded as a *bank* of copies the engine
+  round-robins through, letting fast keystrokes ring out and overlap into a wash.
+  The bank size is sized to each sound's own length (≈one voice per 0.1s, capped
+  at `Klonk.voices`, default 6): a short recorded-keyboard clack resolves to a
+  single crisp voice, while a long sample (paper, splash, kalimba, the LCARS
+  console) fans out and layers. Drop a `voices` file (one integer) in a set folder
+  to pin it — `import_pack.py` writes `1` so real keyboards stay crisp.
+- **Mouse for free.** The same `eventtap` also taps left/right mouse and scroll.
+  A click plays through a `click`→`down` fallback chain and a scroll through
+  `scroll`→`up`, so every existing set voices the mouse with no new files. Scroll
+  is throttled and ignores the inertial *momentum* phase, so a flung trackpad
+  swipe ticks gently instead of roaring.
 
 ## License & credits
 

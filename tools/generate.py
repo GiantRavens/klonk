@@ -5,6 +5,15 @@ A set = a folder of WAVs. The engine's filename convention:
   down1..N.wav   generic key-down variants (randomized per keystroke)
   up1..N.wav     generic key-up variants (quieter release tick)
   space.wav, enter.wav, backspace.wav   dedicated per-key sounds
+  click1..N.wav  mouse-down (heavier sibling of down)
+  clickup.wav    mouse-up release
+  rightclick.wav secondary-click (a touch deeper than click)
+  scroll1..N.wav wheel / trackpad-scroll detent tick (short + quiet)
+
+Mouse voices are OPTIONAL — the engine falls back click->down, scroll->up — but
+every built-in set ships them so the mouse feels purpose-made, not borrowed.
+Regenerate just the mouse files (leaving landed key sounds untouched) with:
+  python3 tools/generate.py Klonk.spoon/sounds --mouse
 
 Each sound is synthesized as: a filtered noise burst (the "contact") plus a few
 exponentially-decaying sine partials (the "body resonance"). Variants detune
@@ -58,6 +67,10 @@ SETS = {
         "space":     (0.13, (1.0, 500, 0.022),  [(98, .7, .055), (150, .4, .035)], 1.1),
         "enter":     (0.12, (0.9, 600, 0.020),  [(115, .65, .05), (175, .35, .03)], 1.05),
         "backspace": (0.09, (0.9, 800, 0.016),  [(165, .55, .04), (245, .3, .025)], 0.95),
+        "click":      (0.11, (1.0, 600, 0.020),  [(120, .7, .05), (180, .4, .032), (330, .16, .02)], 1.05),  # fat round button
+        "clickup":    (0.05, (0.4, 850, 0.008),  [(160, .22, .016)], 0.38),
+        "rightclick": (0.12, (1.0, 520, 0.022),  [(105, .72, .055), (160, .4, .035)], 1.05),                # deeper
+        "scroll":     (0.03, (0.5, 1200, 0.004), [(300, .15, .006)], 0.30),                                 # tiny detent
     },
     "clicky": {  # bright, tactile — MX Blue energy
         "down":      (0.06, (0.7, 5500, 0.008), [(2300, .45, .018), (3600, .3, .012), (1200, .2, .02)], 0.9),
@@ -65,6 +78,10 @@ SETS = {
         "space":     (0.08, (0.8, 3500, 0.012), [(1700, .5, .02), (900, .3, .025)], 1.0),
         "enter":     (0.07, (0.8, 4500, 0.010), [(2000, .5, .02), (3100, .25, .012)], 1.0),
         "backspace": (0.06, (0.7, 6000, 0.007), [(2600, .4, .015), (4000, .25, .01)], 0.85),
+        "click":      (0.07,  (0.8, 5000, 0.009), [(2000, .45, .02), (3200, .3, .013), (1000, .22, .022)], 0.95),
+        "clickup":    (0.04,  (0.5, 6500, 0.005), [(2800, .25, .01)], 0.35),
+        "rightclick": (0.08,  (0.85, 4200, 0.011),[(1700, .5, .022), (2700, .28, .014)], 0.95),
+        "scroll":     (0.025, (0.6, 7000, 0.004), [(4000, .18, .005)], 0.30),
     },
     "typewriter": {  # inharmonic metal — Selectric energy, bell on Enter
         "down":      (0.14, (0.8, 4000, 0.012), [(1250, .4, .05), (2650, .35, .035), (4150, .25, .02), (600, .2, .03)], 0.95),
@@ -72,9 +89,16 @@ SETS = {
         "space":     (0.18, (1.0, 500, 0.030),  [(180, .7, .06), (90, .4, .08)], 1.1),
         "enter":     (0.45, (0.7, 3000, 0.015), [(1250, .3, .04), (3135, .3, .30), (4700, .15, .22)], 1.0),  # ding!
         "backspace": (0.12, (0.8, 4500, 0.010), [(1500, .4, .04), (3000, .25, .025)], 0.9),
+        "click":      (0.10, (0.9, 3000, 0.011), [(900, .4, .03), (1800, .3, .02), (450, .25, .03)], 0.95),  # lever chunk
+        "clickup":    (0.05, (0.5, 4500, 0.006), [(1500, .2, .012)], 0.35),
+        "rightclick": (0.12, (0.9, 2500, 0.013), [(700, .4, .035), (1400, .25, .02)], 0.95),
+        "scroll":     (0.03, (0.6, 5000, 0.005), [(2000, .18, .006)], 0.30),
     },
 }
-VARIANTS = {"down": 5, "up": 3}   # everything else renders once
+# click/scroll get randomized variants (they repeat a lot); clickup/rightclick
+# render once. MOUSE_KEYS drives the additive `--mouse` regen.
+VARIANTS = {"down": 5, "up": 3, "click": 3, "scroll": 2}
+MOUSE_KEYS = {"click", "clickup", "rightclick", "scroll"}
 
 # Per-set Return ding, baked INTO that set's enter.wav (no universal overlay).
 # (f0, dur, level) for a struck bell mixed over the enter keystroke; None means
@@ -215,6 +239,10 @@ THEMED = {
         "space":     (glide, dict(f0=540, f1=640,  dur=0.10,  shape="tri", level=0.55)),
         "enter":     (two_tone, dict(fa=680, fb=1020, dur=0.16, shape="tri", level=0.6)),
         "backspace": (glide, dict(f0=900, f1=560,  dur=0.09,  shape="tri", level=0.5)),  # falling = "undo"
+        "click":      (glide, dict(f0=520, f1=600, dur=0.075, shape="tri", level=0.55)),          # button boop
+        "clickup":    (glide, dict(f0=900, f1=900, dur=0.04, shape="sine", level=0.26)),
+        "rightclick": (two_tone, dict(fa=600, fb=440, dur=0.12, shape="tri", gap=0.5, level=0.55)),  # menu (descending)
+        "scroll":     (glide, dict(f0=1300, f1=1300, dur=0.03, shape="sine", dec=0.012, level=0.22)),
     },
     "water": {  # drip-drop — fast UPWARD pitch bend is the whole illusion
         "down":      (glide, dict(f0=430, f1=1150, dur=0.11, shape="sine", dec=0.045, level=0.55)),
@@ -222,14 +250,19 @@ THEMED = {
         "space":     (glide, dict(f0=300, f1=820,  dur=0.16, shape="sine", dec=0.07,  level=0.6)),   # fat plop
         "enter":     (glide, dict(f0=240, f1=680,  dur=0.20, shape="sine", dec=0.09,  level=0.6)),   # deep plunk
         "backspace": (glide, dict(f0=520, f1=1050, dur=0.09, shape="sine", dec=0.035, level=0.5)),
+        "click":      (glide, dict(f0=340, f1=900,  dur=0.12,  shape="sine", dec=0.05, level=0.58)),  # fat plop
+        "clickup":    (glide, dict(f0=950, f1=1500, dur=0.045, shape="sine", dec=0.02, level=0.24)),
+        "rightclick": (glide, dict(f0=280, f1=760,  dur=0.14,  shape="sine", dec=0.06, level=0.58)),  # deeper plunk
+        "scroll":     (glide, dict(f0=1100, f1=1500, dur=0.03, shape="sine", dec=0.012, level=0.22)),
     },
 }
 
-def render_themed(base):
+def render_themed(base, only=None):
     for set_name, keys in THEMED.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
         for key, (fn, kw) in keys.items():
+            if only and key not in only: continue
             for v in range(1, VARIANTS.get(key, 1) + 1):
                 random.seed(hash((set_name, key, v)))
                 k = dict(kw)
@@ -298,21 +331,38 @@ def gliss(inst, freqs, step=0.05, notedur=0.35, level=0.65):
             buf[k * seg + i] += s
     return finish(buf, level, td=0.03)
 
-def render_musical(base):
+def render_musical(base, only=None):
+    def want(k): return only is None or k in only
     for name, inst in INSTRUMENTS.items():
         d = os.path.join(base, name)
         os.makedirs(d, exist_ok=True)
-        # down variants ARE the scale — random pick → pentatonic improvisation
-        for i, off in enumerate(SCALE, start=1):
-            write_wav(os.path.join(d, f"down{i}.wav"), inst(midi(off)))
-        # up: two soft high grace notes (quiet, so release doesn't muddy melody)
-        for i in range(1, 3):
-            write_wav(os.path.join(d, f"up{i}.wav"),
-                      inst(midi(SCALE[-1] + i * 2), dur=0.18, level=0.20))
-        write_wav(os.path.join(d, "space.wav"), inst(midi(-5), dur=0.6, level=0.55))     # low root
-        write_wav(os.path.join(d, "enter.wav"),                                          # flourish!
-                  gliss(inst, [midi(o) for o in SCALE]))
-        write_wav(os.path.join(d, "backspace.wav"), inst(midi(SCALE[1]), dur=0.3, level=0.45))
+        if want("down"):   # down variants ARE the scale — random pick improvises
+            for i, off in enumerate(SCALE, start=1):
+                write_wav(os.path.join(d, f"down{i}.wav"), inst(midi(off)))
+        if want("up"):     # two soft high grace notes (quiet, so release stays out of the way)
+            for i in range(1, 3):
+                write_wav(os.path.join(d, f"up{i}.wav"),
+                          inst(midi(SCALE[-1] + i * 2), dur=0.18, level=0.20))
+        if want("space"):
+            write_wav(os.path.join(d, "space.wav"), inst(midi(-5), dur=0.6, level=0.55))   # low root
+        if want("enter"):
+            write_wav(os.path.join(d, "enter.wav"), gliss(inst, [midi(o) for o in SCALE]))  # flourish!
+        if want("backspace"):
+            write_wav(os.path.join(d, "backspace.wav"), inst(midi(SCALE[1]), dur=0.3, level=0.45))
+        # mouse = BASS + percussion an octave under the melody, so clicks lay down
+        # a walking low line while the keys sing on top. rightclick = deep root.
+        if want("click"):
+            for i in range(1, VARIANTS.get("click", 1) + 1):
+                write_wav(os.path.join(d, f"click{i}.wav"),
+                          inst(midi(SCALE[(i - 1) % len(SCALE)] - 12), dur=0.5, level=0.5))
+        if want("clickup"):
+            write_wav(os.path.join(d, "clickup.wav"), inst(midi(SCALE[-1] + 2), dur=0.16, level=0.18))
+        if want("rightclick"):
+            write_wav(os.path.join(d, "rightclick.wav"), inst(midi(-17), dur=0.55, level=0.5))  # deep root
+        if want("scroll"):
+            for i in range(1, VARIANTS.get("scroll", 1) + 1):
+                write_wav(os.path.join(d, f"scroll{i}.wav"),
+                          inst(midi(SCALE[-1] + 4 + i * 2), dur=0.14, level=0.16))
         print(f"  {name}: {len(os.listdir(d))} files")
 
 # --- MECHANICAL sets: rendered by synth_mech, not the sine-stack synth --------
@@ -331,6 +381,14 @@ MECH = {
                               ring=[(700,.4,.05),(1400,.24,.03)], sat=3.0, level=0.80),
             "backspace": dict(dur=0.12, thump=(280,175,0.85,0.040), impact=(0.9,3000,0.006),
                               ring=[(900,.4,.04),(1800,.2,.02)], sat=2.8, level=0.72),
+            "click":      dict(dur=0.15, thump=(210,130,1.0,0.06), impact=(1.0,2400,0.007),
+                               ring=[(600,.45,.05),(1200,.28,.03)], sat=3.0, level=0.85),   # relay thunk
+            "clickup":    dict(dur=0.09, thump=(360,260,0.55,0.028), impact=(0.8,3400,0.005),
+                               ring=[(1100,.4,.03)], sat=2.5, level=0.55),
+            "rightclick": dict(dur=0.16, thump=(180,115,1.05,0.07), impact=(1.0,2100,0.008),
+                               ring=[(520,.42,.055),(1000,.22,.03)], sat=3.0, level=0.85),
+            "scroll":     dict(dur=0.05, thump=(500,380,0.4,0.015), impact=(0.6,4000,0.004),
+                               ring=[(1600,.25,.01)], sat=2.0, level=0.4),                   # light ratchet
         },
     },
     "manual": {   # heavy manual typewriter — type-bar SLAP then hammer (ka-thunk)
@@ -347,16 +405,25 @@ MECH = {
                               ring=[(520,.35,.05),(1100,.25,.03)], strike2=(0.008,0.5), sat=2.8, level=0.80),
             "backspace": dict(dur=0.13, thump=(240,150,0.8,0.040), impact=(0.9,2800,0.006),
                               ring=[(700,.4,.04),(1500,.2,.02)], sat=2.6, level=0.72),
+            "click":      dict(dur=0.16, thump=(185,118,0.9,0.05), impact=(1.0,2300,0.007),
+                               ring=[(500,.4,.05),(1050,.3,.03)], strike2=(0.008,0.5), sat=2.8, level=0.82),  # slap+hammer
+            "clickup":    dict(dur=0.05, thump=(400,290,0.4,0.02), impact=(0.6,3500,0.005),
+                               ring=[(1350,.25,.012)], sat=2.0, level=0.4),
+            "rightclick": dict(dur=0.17, thump=(170,108,0.95,0.055), impact=(1.0,2100,0.008),
+                               ring=[(460,.4,.055),(980,.25,.03)], strike2=(0.009,0.5), sat=2.8, level=0.82),
+            "scroll":     dict(dur=0.05, thump=(520,400,0.35,0.015), impact=(0.6,3800,0.004),
+                               ring=[(1500,.22,.01)], sat=2.0, level=0.4),
         },
     },
 }
 
-def render_mech(base):
+def render_mech(base, only=None):
     for set_name, spec in MECH.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
         ding = spec.get("ding")
         for key, kw in spec["keys"].items():
+            if only and key not in only: continue
             for v in range(1, VARIANTS.get(key, 1) + 1):
                 random.seed(hash((set_name, key, v)))
                 k = dict(kw)
@@ -371,14 +438,89 @@ def render_mech(base):
                 write_wav(os.path.join(d, name), s)
         print(f"  {set_name}: {len(os.listdir(d))} files (mechanical)")
 
+# --- AMBIENT beds: looping background soundscapes -----------------------------
+# A bed is a long, quiet, LOOPABLE noise texture that plays under the typing.
+# The whole illusion is shaped filtered noise + slow modulation:
+#   rain  = bright hiss (band-passed noise) + random droplet transients
+#   wind  = dark noise whose level + cutoff swell on a slow, irregular gust LFO
+#   surf  = low rumble with a ~0.08 Hz swell; hiss rides the crest = a wave break
+# loopify() crossfades the tail back over the head so repeat playback has no seam.
+def _noise_lp(dur, cutoff, seed):
+    random.seed(seed)
+    return onepole_lp([random.random() * 2 - 1 for _ in range(int(SR * dur))], cutoff)
+
+def loopify(x, xf=1.2):
+    n = len(x); m = min(int(xf * SR), n // 2)
+    out = list(x[:n - m])
+    for i in range(m):                      # blend the tail back over the head
+        w = i / m
+        out[i] = x[i] * w + x[n - m + i] * (1 - w)
+    peak = max((abs(s) for s in out), default=1.0) or 1.0
+    return [s / peak for s in out]
+
+def bed_rain(dur=12.0, level=0.5):
+    hiss = _noise_lp(dur, 6500, seed=101)
+    low  = onepole_lp(hiss, 900)
+    x = [(h - l) * 0.9 for h, l in zip(hiss, low)]            # band-pass ≈ hiss
+    random.seed(202)                                          # droplets
+    n = len(x); i = 0
+    while i < n:
+        i += int(SR * random.uniform(0.02, 0.09))
+        if i >= n: break
+        f = random.uniform(1800, 5200); a = random.uniform(0.15, 0.5)
+        for j in range(min(int(SR * 0.02), n - i)):
+            t = j / SR
+            x[i + j] += a * math.sin(2 * math.pi * f * t) * math.exp(-t / 0.004)
+    return finish(loopify(x), level, ta=0.02, td=0.02)
+
+def bed_wind(dur=14.0, level=0.5):
+    base = _noise_lp(dur, 1100, seed=303)
+    n = len(base); out = []
+    for i in range(n):
+        t = i / SR
+        gust = 0.55 + 0.45 * math.sin(2*math.pi*0.05*t) * math.sin(2*math.pi*0.017*t + 1.3)
+        out.append(base[i] * gust)
+    return finish(loopify(out), level, ta=0.03, td=0.03)
+
+def bed_surf(dur=14.0, level=0.5):
+    rumble = _noise_lp(dur, 500, seed=404)
+    hiss   = _noise_lp(dur, 7000, seed=505)
+    n = len(rumble); out = []
+    for i in range(n):
+        t = i / SR
+        swell = 0.5 + 0.5 * math.sin(2*math.pi*0.08*t - 1.2)   # ~12 s wave cycle
+        crest = max(0.0, swell - 0.55) / 0.45                  # hiss only on the crest
+        out.append(rumble[i] * (0.4 + 0.6*swell) + hiss[i] * 0.25 * crest)
+    return finish(loopify(out), level, ta=0.03, td=0.03)
+
+AMBIENT = {"rain": bed_rain, "wind": bed_wind, "surf": bed_surf}
+
+def render_ambient(base):
+    d = os.path.join(os.path.dirname(os.path.abspath(base)), "ambient")
+    os.makedirs(d, exist_ok=True)
+    for name, fn in AMBIENT.items():
+        write_wav(os.path.join(d, f"{name}.wav"), fn())
+    print(f"  ambient: {len(AMBIENT)} beds (rain, wind, surf) -> {d}")
+
+
 def main():
-    base = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 \
+    flags = sys.argv[1:]
+    args = [a for a in flags if not a.startswith("-")]
+    only = MOUSE_KEYS if "--mouse" in flags else None          # additive: only touch mouse files
+    ambient_only = "--ambient" in flags                        # additive: only rebuild beds
+    base = os.path.abspath(args[0]) if args \
         else os.path.dirname(os.path.abspath(__file__))
     os.makedirs(base, exist_ok=True)
+    if ambient_only:
+        render_ambient(base)
+        return
+    if only:
+        print("  --mouse: adding click/clickup/rightclick/scroll only (key sounds untouched)")
     for set_name, keys in SETS.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
         for key, (dur, noise, partials, gain) in keys.items():
+            if only and key not in only: continue
             for v in range(1, VARIANTS.get(key, 1) + 1):
                 rng = random.Random(hash((set_name, key, v)))
                 random.seed(hash((set_name, key, v, "noise")))
@@ -390,10 +532,12 @@ def main():
                 name = f"{key}{v}.wav" if key in VARIANTS else f"{key}.wav"
                 write_wav(os.path.join(d, name), s)
         print(f"  {set_name}: {len(os.listdir(d))} files")
-    render_mech(base)
-    render_themed(base)
-    render_musical(base)
-    print("  (each set's Return ding is baked into its own enter.wav)")
+    render_mech(base, only)
+    render_themed(base, only)
+    render_musical(base, only)
+    if not only:
+        render_ambient(base)
+        print("  (each set's Return ding is baked into its own enter.wav)")
 
 if __name__ == "__main__":
     main()
