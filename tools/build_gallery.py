@@ -90,7 +90,7 @@ html = """<!doctype html>
     <p class="hint">Same engine as the Hammerspoon Spoon: a set is just a folder of WAVs.</p>
   </div>
   <footer>Built by <code>tools/build_gallery.py</code> · synthesized sets are CC0 ·
-    <a href="https://github.com/skiplevens/klonk">github.com/skiplevens/klonk</a></footer>
+    <a href="https://github.com/giantravens/klonk">github.com/giantravens/klonk</a></footer>
 <script>
 const SETS = __PAYLOAD__;
 const LABELS = __LABELS__;

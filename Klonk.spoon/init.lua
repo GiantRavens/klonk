@@ -10,7 +10,7 @@
 --- toggle sound, pick a set, or set the volume. Sets are scanned from the
 --- bundled `sounds/` folder plus `~/.klonk/sounds` (your own).
 ---
---- Download: https://github.com/skiplevens/klonk
+--- Download: https://github.com/giantravens/klonk
 
 local obj = {}
 obj.__index = obj
@@ -18,7 +18,7 @@ obj.__index = obj
 obj.name = "Klonk"
 obj.version = "1.0"
 obj.author = "Skip Levens"
-obj.homepage = "https://github.com/skiplevens/klonk"
+obj.homepage = "https://github.com/giantravens/klonk"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 
 --- Klonk.soundDirs

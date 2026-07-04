@@ -17,7 +17,7 @@ the same logic client-side, no install.
 klonk is a [Hammerspoon](https://www.hammerspoon.org) Spoon.
 
 ```sh
-git clone https://github.com/skiplevens/klonk.git
+git clone https://github.com/giantravens/klonk.git
 cp -r klonk/Klonk.spoon ~/.hammerspoon/Spoons/
 ```
 
