@@ -16,8 +16,8 @@ mouse click identically, so both are covered by the same click sound; a set can
 ship dedicated `click` / `clickup` / `rightclick` / `scroll` WAVs to give the
 mouse its own voice.
 
-▶️ **[Try it in your browser](previews/gallery.html)** — pick a set and type; it runs
-the same logic client-side, no install.
+▶️ **[Try it in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
+pick a set and type; it runs the same logic client-side, no install.
 
 ---
 
