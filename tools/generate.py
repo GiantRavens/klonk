@@ -257,10 +257,18 @@ THEMED = {
     },
 }
 
+def tag(d, cat):
+    """Declare the set's family (a one-word `category` file in the set folder).
+    The generator knows what it synthesized; the menu groups by reading this —
+    no hardcoded name→group map to drift out of date."""
+    with open(os.path.join(d, "category"), "w") as f:
+        f.write(cat + "\n")
+
 def render_themed(base, only=None):
     for set_name, keys in THEMED.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
+        tag(d, "themed")
         for key, (fn, kw) in keys.items():
             if only and key not in only: continue
             for v in range(1, VARIANTS.get(key, 1) + 1):
@@ -336,6 +344,7 @@ def render_musical(base, only=None):
     for name, inst in INSTRUMENTS.items():
         d = os.path.join(base, name)
         os.makedirs(d, exist_ok=True)
+        tag(d, "musical")
         if want("down"):   # down variants ARE the scale — random pick improvises
             for i, off in enumerate(SCALE, start=1):
                 write_wav(os.path.join(d, f"down{i}.wav"), inst(midi(off)))
@@ -421,6 +430,7 @@ def render_mech(base, only=None):
     for set_name, spec in MECH.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
+        tag(d, "mechanical")
         ding = spec.get("ding")
         for key, kw in spec["keys"].items():
             if only and key not in only: continue
@@ -519,6 +529,7 @@ def main():
     for set_name, keys in SETS.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
+        tag(d, "mechanical")
         for key, (dur, noise, partials, gain) in keys.items():
             if only and key not in only: continue
             for v in range(1, VARIANTS.get(key, 1) + 1):

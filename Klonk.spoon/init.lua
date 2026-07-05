@@ -105,6 +105,29 @@ function obj:_setDir(name)
   end
 end
 
+-- A set's family comes from an optional one-word `category` file in its folder
+-- (same pattern as the `voices` override), written by tools/generate.py — the
+-- generator knows what it synthesized — and tools/import_pack.py (recordings
+-- of real switches). The menu groups by reading it, so there's no hardcoded
+-- name→family map to drift; untagged or unknown sets land in "More sets".
+local CATEGORIES = {
+  { key = "samples",    label = "Keyboard samples" },
+  { key = "mechanical", label = "Mechanical"       },
+  { key = "themed",     label = "Themed"           },
+  { key = "musical",    label = "Musical"          },
+  { key = "other",      label = "More sets"        },
+}
+
+function obj:_category(name)
+  local dir = self:_setDir(name)
+  local f = dir and io.open(dir .. "/category", "r")
+  if not f then return "other" end
+  local c = ((f:read("*a") or ""):match("%a+") or ""):lower()
+  f:close()
+  for _, cat in ipairs(CATEGORIES) do if cat.key == c then return c end end
+  return "other"
+end
+
 -- Preload a set into hs.sound objects once, so keystroke playback is a table
 -- lookup + play with no disk I/O on the hot path. Files follow the convention:
 -- down1..N / up1..N (randomized variants) and space / enter / backspace.
@@ -247,15 +270,33 @@ function obj:_menuItems()
     { title = hs.styledtext.new("klonk", { font = { name = "Menlo-Bold", size = 11 },
         color = { white = 0.5 } }), disabled = true },
     { title = "-" },
-    { title = self._on and "Sounds: on" or "Sounds: off",
+    -- Action-verb labels: the row says what CLICKING does, not what the state
+    -- is (the state is already visible — the icon dims and slashes when muted).
+    { title = self._on and "Turn sounds off" or "Turn sounds on",
       fn = function() self._on = not self._on; self:_refresh() end },
-    { title = self._mouse and "Mouse clicks: on" or "Mouse clicks: off",
+    { title = self._mouse and "Turn mouse clicks off" or "Turn mouse clicks on",
       fn = function() self._mouse = not self._mouse; self:_refresh() end },
     { title = "-" },
   }
+  -- Sets grouped by family, one submenu each (the Ambient pattern). The
+  -- checkmark on a family row points at where the active set lives.
+  local groups = {}
   for _, s in ipairs(self:_sets()) do
-    items[#items + 1] = { title = s, checked = (s == self._set),
-      fn = function() self:_load(s); self:_refresh() end }
+    local c = self:_category(s)
+    groups[c] = groups[c] or {}
+    groups[c][#groups[c] + 1] = s
+  end
+  for _, cat in ipairs(CATEGORIES) do
+    local names = groups[cat.key]
+    if names then
+      local rows, active = {}, false
+      for _, s in ipairs(names) do
+        if s == self._set then active = true end
+        rows[#rows + 1] = { title = s, checked = (s == self._set),
+          fn = function() self:_load(s); self:_refresh() end }
+      end
+      items[#items + 1] = { title = cat.label, menu = rows, checked = active }
+    end
   end
   local vol = {}
   for _, v in ipairs(VOLUMES) do
