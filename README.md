@@ -62,7 +62,7 @@ launches with Hammerspoon, so there's no separate startup item.
 
 ## Install
 
-klonk is a [Hammerspoon](https://www.hammerspoon.org) Spoon.
+klonk requires [Hammerspoon](https://www.hammerspoon.org).
 
 ```sh
 git clone https://github.com/giantravens/klonk.git
