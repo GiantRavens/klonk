@@ -1,0 +1,7 @@
+Recorded ping-pong set curated from the repository owner's retro-terminals
+sound collection:
+
+- retro-terminals assets/sounds/sfx/Ping Pong 1.mp3
+- retro-terminals assets/sounds/sfx/Ping Pong 2.mp3
+
+Sources were decoded to mono 44.1 kHz WAV for Klonk and the browser demo.

@@ -1,0 +1,4 @@
+Set 'blues' imported from Mechvibes pack 'cherrymx-blue-pbt' (single)
+https://raw.githubusercontent.com/hainguyents13/mechvibes/main/src/audio/cherrymx-blue-pbt/
+License: MIT (github.com/hainguyents13/mechvibes)
+enter.wav mixes in the REAL CC0 typewriter bell (_bell.wav).
