@@ -1,4 +1,6 @@
 .DS_Store
 __pycache__/
 *.pyc
+.punchlist/config.yaml
+tasks/
 # personal imported sets live in ~/.klonk/sounds, never in the repo
