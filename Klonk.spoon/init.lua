@@ -81,6 +81,7 @@ obj._bedVol   = 0.5
 obj._wpViews  = {}      -- one webview per screen while a video desktop is active
 obj._wp       = nil     -- current video-desktop clip basename (nil = off)
 obj._wpPauseBattery = false
+obj._wpSpeed  = 1.0     -- video-desktop playback rate (1.0 = normal, <1 = slow motion)
 
 -- Which dedicated file plays for which macOS key code.
 local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
@@ -283,7 +284,13 @@ end
 -- Sorenson give error.code 4 — transcode with ffmpeg -c:v libx264 first.
 -- ===========================================================================
 local WP_EXTS     = { mp4 = true, mov = true, m4v = true }
+local WP_SPEEDS   = { 1.0, 0.5, 0.25, 0.1 }   -- video-desktop playback rates (slow-mo)
+-- Apple keeps aerials in TWO stores, and which one a clip lands in depends on how
+-- you added it: the system SCREENSAVER store (idleassetsd, SDR subdirs) vs. the
+-- per-user WALLPAPER store (populated only when you *Activate* an aerial in
+-- System Settings ▸ Wallpaper — merely previewing it downloads nothing). Scan both.
 local AERIAL_ROOT = "/Library/Application Support/com.apple.idleassetsd/Customer"
+local AERIAL_WP   = os.getenv("HOME") .. "/Library/Application Support/com.apple.wallpaper/aerials/videos"
 
 -- Quote a basename as a JS double-quoted string (hs.json.encode rejects bare
 -- strings); assigning it to video.src lets the browser resolve spaces/Unicode.
@@ -307,42 +314,69 @@ end
 
 -- Symlink whatever Apple Aerials are downloaded (any category — Landscape,
 -- Cityscape, Underwater, Earth) into the folder; a symlink into the folder plays
--- even though the target is root-owned /Library. Friendly names come from
--- entries.json (id → accessibilityLabel). SDR only (skip HDR washout). Prunes
--- symlinks whose target has vanished. Returns the count linked.
+-- even though the target is root-owned /Library. Scans BOTH stores (screensaver +
+-- wallpaper). Friendly names come from entries.json (id → accessibilityLabel).
+-- SDR only from idleassetsd (skip HDR washout); the wallpaper store is already
+-- SDR. Dedups by name, prunes symlinks whose target has vanished. Returns count.
 function obj:_syncAerials()
   local dir = self:_wpDir(); hs.fs.mkdir(dir)
+  -- Merge id→name from BOTH catalogs: the idleassetsd one and the wallpaper
+  -- store's own manifest (newer, names the recently-added aerials the old one
+  -- lacks). Wallpaper manifest is read second so it wins on any conflict.
   local names = {}
-  local fh = io.open(AERIAL_ROOT .. "/entries.json", "r")
-  if fh then
-    local ok, data = pcall(hs.json.decode, fh:read("a")); fh:close()
-    if ok and type(data) == "table" and data.assets then
-      for _, a in ipairs(data.assets) do
-        if a.id then names[a.id:lower()] = a.accessibilityLabel or a.id end
-      end
-    end
-  end
-  local linked = 0
-  if hs.fs.attributes(AERIAL_ROOT) then
-    for sub in hs.fs.dir(AERIAL_ROOT) do
-      local subdir = AERIAL_ROOT .. "/" .. sub
-      if sub:find("SDR") and hs.fs.attributes(subdir, "mode") == "directory" then
-        for f in hs.fs.dir(subdir) do
-          local uuid = f:match("^(.+)%.mov$")
-          if uuid then
-            local nm   = (names[uuid:lower()] or uuid):gsub("[/:]", "-")
-            local link = dir .. "/Aerial - " .. nm .. ".mov"
-            os.remove(link)
-            if hs.fs.link(subdir .. "/" .. f, link, true) then linked = linked + 1 end
-          end
+  for _, ejson in ipairs({
+    AERIAL_ROOT .. "/entries.json",
+    (AERIAL_WP:gsub("/videos$", "")) .. "/manifest/entries.json",
+  }) do
+    local fh = io.open(ejson, "r")
+    if fh then
+      local ok, data = pcall(hs.json.decode, fh:read("a")); fh:close()
+      if ok and type(data) == "table" and data.assets then
+        for _, a in ipairs(data.assets) do
+          if a.id then names[a.id:lower()] = a.accessibilityLabel or a.id end
         end
       end
     end
   end
-  for f in hs.fs.dir(dir) do                                   -- prune dangling symlinks
+  -- Collect source dirs: idleassetsd SDR subdirs + the flat wallpaper store.
+  local sources = {}
+  if hs.fs.attributes(AERIAL_ROOT) then
+    for sub in hs.fs.dir(AERIAL_ROOT) do
+      local subdir = AERIAL_ROOT .. "/" .. sub
+      if sub:find("SDR") and hs.fs.attributes(subdir, "mode") == "directory" then
+        sources[#sources + 1] = subdir
+      end
+    end
+  end
+  if hs.fs.attributes(AERIAL_WP) then sources[#sources + 1] = AERIAL_WP end
+
+  local linked, seen = 0, {}
+  for _, srcdir in ipairs(sources) do
+    for f in hs.fs.dir(srcdir) do
+      local uuid = f:match("^(.+)%.mov$")
+      if uuid then
+        local nm   = (names[uuid:lower()] or uuid):gsub("[/:]", "-")
+        local base = "Aerial - " .. nm .. ".mov"
+        if not seen[base] then                                 -- dedup: same aerial can be in both stores
+          seen[base] = true
+          local link = dir .. "/" .. base
+          os.remove(link)
+          if hs.fs.link(srcdir .. "/" .. f, link, true) then linked = linked + 1 end
+        end
+      end
+    end
+  end
+  -- Prune symlinks that are dangling (target gone) OR stale "Aerial - …" links
+  -- not (re)created this run — the latter clears duplicates left behind when an
+  -- aerial gains a better name. Real user-dropped files (not symlinks) are kept.
+  for f in hs.fs.dir(dir) do
     local p  = dir .. "/" .. f
     local la = hs.fs.symlinkAttributes(p)
-    if la and la.mode == "link" and not hs.fs.attributes(p) then os.remove(p) end
+    if la and la.mode == "link" then
+      if not hs.fs.attributes(p) or (f:match("^Aerial %- ") and not seen[f]) then
+        os.remove(p)
+      end
+    end
   end
   return linked
 end
@@ -353,9 +387,9 @@ function obj:_writeWallpaperHTML(name)
     'html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}',
     'video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}',
     '</style></head><body><video autoplay loop muted playsinline></video><script>',
-    'var v=document.querySelector("video");',
+    'var v=document.querySelector("video"), R=' .. string.format("%.4f", self._wpSpeed) .. ';',
     'v.src=' .. jsString(name) .. '; v.muted=true;',
-    'function go(){var p=v.play(); if(p&&p.catch)p.catch(function(){});}',
+    'function go(){v.playbackRate=R; var p=v.play(); if(p&&p.catch)p.catch(function(){});}',
     'v.addEventListener("canplay",go); go();',
     'document.addEventListener("visibilitychange",function(){if(!document.hidden)go();});',
     '</script></body></html>',
@@ -400,6 +434,15 @@ function obj:_setWallpaper(name)
   self._wp = name
   if name then hs.settings.set("klonk.wallpaper", name) else hs.settings.clear("klonk.wallpaper") end
   self:_applyWallpaper()
+end
+
+-- Change playback rate live on every showing view (no reload/restart) and persist
+-- it; _writeWallpaperHTML bakes the same rate in for the next fresh load.
+function obj:_setWallpaperSpeed(r)
+  self._wpSpeed = r
+  hs.settings.set("klonk.wpspeed", r)
+  local js = "var v=document.querySelector('video'); if(v){v.playbackRate=" .. string.format("%.4f", r) .. ";}"
+  for _, w in ipairs(self._wpViews) do w:evaluateJavaScript(js) end
 end
 
 function obj:_refresh()
@@ -508,6 +551,13 @@ function obj:_menuItems()
     end
   end
   vid[#vid + 1] = { title = "-" }
+  local spd = {}
+  for _, r in ipairs(WP_SPEEDS) do
+    spd[#spd + 1] = { title = (r == 1.0 and "Normal" or (tostring(r) .. "×")),
+      checked = (math.abs(r - self._wpSpeed) < 0.001),
+      fn = function() self:_setWallpaperSpeed(r) end }
+  end
+  vid[#vid + 1] = { title = "Speed", menu = spd, checked = (self._wpSpeed ~= 1.0) }
   vid[#vid + 1] = { title = "Pause on battery", checked = self._wpPauseBattery,
     fn = function()
       self._wpPauseBattery = not self._wpPauseBattery
@@ -650,6 +700,7 @@ function obj:start()
   -- Video desktop: restore last pick, keep Apple aerials linked, and re-render
   -- on screen-layout / battery changes so the clip tracks the live geometry.
   self._wpPauseBattery = hs.settings.get("klonk.wppausebattery") or false
+  self._wpSpeed = hs.settings.get("klonk.wpspeed") or 1.0
   self._wp = hs.settings.get("klonk.wallpaper")
   self:_syncAerials()
   self._wpScreen = self._wpScreen or hs.screen.watcher.new(function() self:_applyWallpaper() end):start()
