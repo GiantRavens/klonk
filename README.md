@@ -9,6 +9,13 @@ on the same idea — *the folder is the config*:
 - **Ambient sounds** — a loopable background bed (rain, surf, a bridge hum) under the typing.
 - **Video desktop** — a scenic clip looping behind your desktop icons (your own, or Apple's Aerials).
 
+Together they're one control surface for **curating your entire workspace
+experience** — what you hear as you type, the soundscape underneath it, and what
+moves behind your icons — from a single menu-bar icon, all remembered across
+restarts. Every pillar follows the same rule, *the folder is the config*: add a
+WAV set, a loopable bed, or a video clip and it just shows up in the menu. Nothing
+to configure, no accounts, no daemon — set the mood and get back to work.
+
 klonk plays a sound as you type, anywhere in macOS. A *sound set* is just a folder
 of WAVs, so the built-in synthesized and recorded sets—and anything you drop in—play
 the same way. Each set gives Return its own flourish through `enter.wav`.
@@ -29,19 +36,44 @@ pick a set and type; it runs the same logic client-side, no install.
 
 ## Video desktop
 
-The **Video desktop** submenu loops a scenic clip behind your desktop icons — the
-desktop-window trick every live-wallpaper app uses, rendered in an `hs.webview`
-pinned just below the icon layer, muted and looped, on every screen. Two ways to
-fill it, both scanning the same `~/Movies/Klonk/Wallpapers` folder:
+The **Video desktop** submenu loops a scenic clip *behind* your desktop icons —
+the desktop-window trick every live-wallpaper app uses, but with no extra app and
+no login item. klonk renders the clip in an `hs.webview` pinned one level below the
+icon layer (in front of the wallpaper, behind your icons), muted and looped, one
+view per screen, and re-renders when your display layout changes.
 
-- **Drop your own clips** — any `.mp4`/`.mov`/`.m4v` (WebKit decodes H.264/HEVC;
-  transcode ProRes/other with `ffmpeg -c:v libx264` first). They appear as picks.
-- **Apple Aerials, zero-copy** — *Sync Apple aerials now* symlinks whatever
-  screensaver Aerials you've downloaded (System Settings ▸ Wallpaper) straight in
-  by their real names. Symlinks, not copies, so they cost nothing and stay current.
+Everything lives in `~/Movies/Klonk/Wallpapers`, and the picker scans it for
+`.mp4` / `.mov` / `.m4v` — whether each entry is a file you dropped or a symlink.
 
-*Pause on battery* stops playback on battery power. The pick is remembered and
-restored at login.
+**Drop your own clips.** Any H.264/HEVC clip appears as a pick. WebKit can't decode
+ProRes / Animation / Sorenson, so transcode those first:
+
+```sh
+ffmpeg -i in.mov -c:v libx264 -pix_fmt yuv420p -movflags +faststart -an out.mp4
+```
+
+**Or use Apple's Aerials, zero-copy.** *Sync Apple aerials now* symlinks every
+Aerial macOS has downloaded straight into the folder by its real name — symlinks,
+not 250 MB copies, so they cost nothing and always reflect what Apple currently
+ships. It scans **both** places macOS keeps them:
+
+- the **screensaver** store (System Settings ▸ Screen Saver), and
+- the per-user **wallpaper** store (System Settings ▸ Wallpaper).
+
+> ⚠️ **Aerials only download when you *activate* one.** Scrolling past an aerial in
+> the gallery downloads nothing — click to set it as your screensaver or wallpaper
+> and macOS fetches the clip into one of the stores above. Then run *Sync Apple
+> aerials now* and it appears in your picker. Names come from Apple's own catalogs;
+> a brand-new aerial not yet catalogued shows as its raw UUID (it still plays).
+
+**Slow motion.** The **Speed** submenu — Normal / 0.5× / 0.25× / 0.1× — sets the
+clip's `playbackRate`. Apple's Aerials are high-bitrate cinematic drone footage, so
+0.25× drifts by dreamily instead of stuttering. Speed changes apply *live* to the
+running wallpaper (no restart) and are remembered.
+
+**Battery-aware.** *Pause on battery* stops playback on battery power and resumes on
+AC. Your pick, speed, and this toggle all persist and restore at login — klonk
+launches with Hammerspoon, so there's no separate startup item.
 
 ---
 
@@ -69,8 +101,9 @@ spoon.Klonk:bindHotkeys({
 })
 ```
 
-Reload Hammerspoon. A keyboard icon appears in the menu bar — click it to toggle
-sound, pick a set, or set the volume. Your choice persists across restarts.
+Reload Hammerspoon. A keyboard icon appears in the menu bar; clicking it opens the
+three groups — **Keyboard sounds**, **Ambient sounds**, and **Video desktop** —
+each remembering your choice across restarts.
 
 macOS will ask to grant Hammerspoon **Accessibility** permission (needed to hear
 keystrokes); klonk only *listens* — it never intercepts or alters your typing.
@@ -197,7 +230,7 @@ set folder in `~/Music/Klonk/Sounds/<name>/`:
 ## Ambient beds
 
 klonk can also play a **looping background soundscape** under your typing — pick
-one from the menu-bar **Ambient** submenu (with its own bed volume). Three CC0
+one from the menu-bar **Ambient sounds** submenu (with its own bed volume). Three CC0
 beds ship synthesized: `rain`, `wind`, `surf`. Drop your own long, loopable audio
 into `~/Music/Klonk/Ambience/<name>.m4a` (waves, a thunderstorm, a starship bridge hum)
 and it joins the list. Beds are independent of the keystroke switch and resume
@@ -263,6 +296,14 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
   `scroll`→`up`, so every existing set voices the mouse with no new files. Scroll
   is throttled and ignores the inertial *momentum* phase, so a flung trackpad
   swipe ticks gently instead of roaring.
+- **The video desktop is a browser, not a player.** The wallpaper is a muted,
+  looping `<video>` inside an `hs.webview` pinned below the desktop-icon layer — so
+  slow motion is one HTML property (`playbackRate`) with no re-encoding, and a
+  local clip plays by *relative* name from a wrapper page written into the same
+  folder. That relative-name trick is also why a symlink to a root-owned Apple
+  Aerial under `/Library` plays: WebKit resolves it within the folder it was
+  granted. Aerials are linked, never copied, and the sync reads Apple's own JSON
+  catalogs (both stores') for their names.
 
 ## License & credits
 
