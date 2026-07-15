@@ -1,4 +1,8 @@
 Set 'pandas' imported from Mechvibes pack 'holy-pandas' (multi)
 https://raw.githubusercontent.com/hainguyents13/mechvibes/main/src/audio/holy-pandas/
-License: MIT (github.com/hainguyents13/mechvibes)
+Recording creator: Thomas Lai (@tplai), from kbsim
+https://github.com/tplai/kbsim
+Mechvibes adaptation: Rob Landers (@withinboredom)
+https://github.com/withinboredom
+License: MIT, copyright Thomas Lai
 enter.wav mixes in the REAL CC0 typewriter bell (_bell.wav).

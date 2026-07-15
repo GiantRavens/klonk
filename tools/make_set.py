@@ -2,8 +2,8 @@
 """Turn a folder of one-shot samples into a klonk sound set.
 
 Where `import_pack.py` slices Mechvibes keyboard sprites, this generalizes to
-ANY pile of short recordings — paper crinkles, ping-pong bounces, sparks, splashes,
-Star Trek console blips — and maps them onto klonk's filename convention, mouse
+ANY pile of short recordings — paper crinkles, ping-pong bounces, sparks,
+splashes, and console blips — and maps them onto klonk's filename convention, mouse
 voices included:
 
     down1..N   the samples themselves (a random one plays per key)
@@ -108,7 +108,7 @@ def main():
     bell = "--bell" in argv
     argv = [a for a in argv if a != "--bell"]
     maxdown = 8
-    role_override = {}          # role -> source basename, for semantic sets (e.g. LCARS)
+    role_override = {}          # role -> source basename for semantic sets
     for opt in ("--maxdown", "--enter", "--space"):
         if opt in argv:
             i = argv.index(opt)

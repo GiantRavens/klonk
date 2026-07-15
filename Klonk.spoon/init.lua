@@ -26,7 +26,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "Klonk"
-obj.version = "2.0"
+obj.version = "2.1"
 obj.author = "Skip Levens"
 obj.homepage = "https://github.com/giantravens/klonk"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
@@ -78,10 +78,13 @@ obj._lastScroll = 0
 obj._bed      = nil     -- current ambient bed name (nil = none)
 obj._bedSound = nil     -- the looping hs.sound object
 obj._bedVol   = 0.5
+obj._audioMuted = false -- one master mute over keyboard/mouse + ambient audio
 obj._wpViews  = {}      -- one webview per screen while a video desktop is active
 obj._wp       = nil     -- current video-desktop clip basename (nil = off)
 obj._wpPauseBattery = false
 obj._wpSpeed  = 1.0     -- video-desktop playback rate (1.0 = normal, <1 = slow motion)
+obj._wpChangeMinutes = 0 -- 0 loops the selected clip; otherwise shuffle on this cadence
+obj._wpChangeTimer = nil
 
 -- Which dedicated file plays for which macOS key code.
 local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
@@ -240,11 +243,11 @@ end
 
 -- Swap the looping background bed. name=nil stops it. hs.sound loops natively,
 -- so a bed is one long file played on repeat under everything else — it's fully
--- independent of the keystroke master switch.
+-- independent of the keyboard switch, but covered by the top-level audio mute.
 function obj:_playBed(name)
   if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
   self._bed = name
-  if not name then return end
+  if not name or self._audioMuted then return end
   local path = self:_bedFile(name)
   if not path then self._bed = nil; return end
   local s = hs.sound.getByFile(path)
@@ -284,7 +287,8 @@ end
 -- Sorenson give error.code 4 — transcode with ffmpeg -c:v libx264 first.
 -- ===========================================================================
 local WP_EXTS     = { mp4 = true, mov = true, m4v = true }
-local WP_SPEEDS   = { 1.0, 0.5, 0.25, 0.1 }   -- video-desktop playback rates (slow-mo)
+local WP_SPEEDS   = { 1.0, 0.5, 0.25, 0.1, 0.05 } -- video-desktop playback rates (slow-mo)
+local WP_CHANGE_MINUTES = { 0, 20, 60, 120 }     -- 0 = keep looping the selected clip
 -- Apple keeps aerials in TWO stores, and which one a clip lands in depends on how
 -- you added it: the system SCREENSAVER store (idleassetsd, SDR subdirs) vs. the
 -- per-user WALLPAPER store (populated only when you *Activate* an aerial in
@@ -388,9 +392,10 @@ function obj:_writeWallpaperHTML(name)
     'video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}',
     '</style></head><body><video autoplay loop muted playsinline></video><script>',
     'var v=document.querySelector("video"), R=' .. string.format("%.4f", self._wpSpeed) .. ';',
-    'v.src=' .. jsString(name) .. '; v.muted=true;',
+    'v.src=' .. jsString(name) .. '; v.muted=true; v.loop=true;',
     'function go(){v.playbackRate=R; var p=v.play(); if(p&&p.catch)p.catch(function(){});}',
     'v.addEventListener("canplay",go); go();',
+    'v.addEventListener("ended",function(){v.currentTime=0;go();});',
     'document.addEventListener("visibilitychange",function(){if(!document.hidden)go();});',
     '</script></body></html>',
   }, "\n")
@@ -430,10 +435,41 @@ function obj:_applyWallpaper()
   end
 end
 
-function obj:_setWallpaper(name)
+function obj:_setWallpaper(name, keepSchedule)
   self._wp = name
   if name then hs.settings.set("klonk.wallpaper", name) else hs.settings.clear("klonk.wallpaper") end
   self:_applyWallpaper()
+  if not keepSchedule then self:_restartWallpaperTimer() end
+end
+
+-- Pick a different clip when possible. The selected clip still loops continuously;
+-- shuffling only replaces that selection now or on the configured long cadence.
+function obj:_shuffleWallpaper()
+  local clips = self:_wallpapers()
+  if #clips == 0 then return end
+  local choices = {}
+  for _, name in ipairs(clips) do
+    if #clips == 1 or name ~= self._wp then choices[#choices + 1] = name end
+  end
+  self:_setWallpaper(choices[math.random(#choices)], true)
+end
+
+function obj:_restartWallpaperTimer()
+  if self._wpChangeTimer then self._wpChangeTimer:stop(); self._wpChangeTimer = nil end
+  if self._wp and self._wpChangeMinutes > 0 then
+    self._wpChangeTimer = hs.timer.doEvery(self._wpChangeMinutes * 60, function()
+      if not (self._wpPauseBattery and hs.battery.powerSource() == "Battery Power") then
+        self:_shuffleWallpaper()
+      end
+    end)
+  end
+end
+
+function obj:_setWallpaperChangeMinutes(minutes)
+  self._wpChangeMinutes = minutes
+  hs.settings.set("klonk.wpchangeminutes", minutes)
+  if minutes > 0 and not self._wp then self:_shuffleWallpaper() end
+  self:_restartWallpaperTimer()
 end
 
 -- Change playback rate live on every showing view (no reload/restart) and persist
@@ -446,10 +482,11 @@ function obj:_setWallpaperSpeed(r)
 end
 
 function obj:_refresh()
-  if self._menu then self._menu:setIcon(icon(self._on)) end
+  if self._menu then self._menu:setIcon(icon(not self._audioMuted and self._on)) end
   if self._tap then
-    if self._on then self._tap:start() else self._tap:stop() end
+    if self._on and not self._audioMuted then self._tap:start() else self._tap:stop() end
   end
+  hs.settings.set("klonk.audiomuted", self._audioMuted)
   hs.settings.set("klonk.on", self._on)
   hs.settings.set("klonk.mouse", self._mouse)
   hs.settings.set("klonk.set", self._set)
@@ -462,11 +499,34 @@ function obj:_menuItems()
   -- ---- Keyboard sounds ----------------------------------------------------
   -- Action-verb labels: the row says what CLICKING does, not what the state is
   -- (the state is already visible — the icon dims and slashes when muted).
+  local vol = {}
+  for _, v in ipairs(VOLUMES) do
+    vol[#vol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
+      checked = (math.abs(v - self._vol) < 0.01),
+      fn = function()
+        self._vol = v
+        for _, pool in pairs(self._pool) do
+          for _, bank in ipairs(pool) do
+            for _, snd in ipairs(bank.copies) do snd:volume(v) end
+          end
+        end
+        self:_refresh()
+      end }
+  end
   local kb = {
-    { title = self._on and "Turn sounds off" or "Turn sounds on",
+    { title = self._on and "Turn keyboard sounds off" or "Turn keyboard sounds on",
       fn = function() self._on = not self._on; self:_refresh() end },
     { title = self._mouse and "Turn mouse clicks off" or "Turn mouse clicks on",
       fn = function() self._mouse = not self._mouse; self:_refresh() end },
+    { title = "Volume", menu = vol },
+    { title = "Add sound sets…", fn = function()
+      local d = expand("~/Music/Klonk/Sounds"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+    end },
+    { title = "Get recorded keyboard sounds…", fn = function()
+      hs.urlevent.openURL("https://github.com/giantravens/klonk#real-recorded-keyboards")
+    end },
+    { title = "a set = folder of WAVs: down1..N, up1..N,", disabled = true, indent = 1 },
+    { title = "space, enter, backspace; optional click, scroll", disabled = true, indent = 1 },
     { title = "-" },
   }
   -- Sets grouped by family, one submenu each. The checkmark on a family row
@@ -489,38 +549,8 @@ function obj:_menuItems()
       kb[#kb + 1] = { title = cat.label, menu = rows, checked = active }
     end
   end
-  local vol = {}
-  for _, v in ipairs(VOLUMES) do
-    vol[#vol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
-      checked = (math.abs(v - self._vol) < 0.01),
-      fn = function()
-        self._vol = v
-        for _, pool in pairs(self._pool) do
-          for _, bank in ipairs(pool) do
-            for _, snd in ipairs(bank.copies) do snd:volume(v) end
-          end
-        end
-        self:_refresh()
-      end }
-  end
-  kb[#kb + 1] = { title = "-" }
-  kb[#kb + 1] = { title = "Volume", menu = vol }
-  kb[#kb + 1] = { title = "-" }
-  kb[#kb + 1] = { title = "Add sound sets…", fn = function()
-    local d = expand("~/Music/Klonk/Sounds"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
-  end }
-  kb[#kb + 1] = { title = "a set = folder of WAVs: down1..N, up1..N,", disabled = true, indent = 1 }
-  kb[#kb + 1] = { title = "space, enter, backspace; optional click, scroll", disabled = true, indent = 1 }
-
   -- ---- Ambient sounds -----------------------------------------------------
   -- A looping background soundscape (rain, surf, hum) under the typing.
-  local amb = { { title = "None", checked = (self._bed == nil),
-    fn = function() self:_playBed(nil); self:_refresh() end }, { title = "-" } }
-  for _, b in ipairs(self:_beds()) do
-    amb[#amb + 1] = { title = b, checked = (b == self._bed),
-      fn = function() self:_playBed(b); self:_refresh() end }
-  end
-  amb[#amb + 1] = { title = "-" }
   local bvol = {}
   for _, v in ipairs(VOLUMES) do
     bvol[#bvol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
@@ -531,39 +561,50 @@ function obj:_menuItems()
         self:_refresh()
       end }
   end
-  amb[#amb + 1] = { title = "Bed volume", menu = bvol }
-  amb[#amb + 1] = { title = "-" }
-  amb[#amb + 1] = { title = "Add ambient beds…", fn = function()
-    local d = expand("~/Music/Klonk/Ambience"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
-  end }
+  local amb = {
+    { title = "Turn ambient sounds off", checked = (self._bed == nil),
+      fn = function() self:_playBed(nil); self:_refresh() end },
+    { title = "Bed volume", menu = bvol },
+    { title = "Add ambient beds…", fn = function()
+      local d = expand("~/Music/Klonk/Ambience"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+    end },
+    { title = "-" },
+  }
+  for _, b in ipairs(self:_beds()) do
+    amb[#amb + 1] = { title = b, checked = (b == self._bed),
+      fn = function() self:_playBed(b); self:_refresh() end }
+  end
 
   -- ---- Video desktop ------------------------------------------------------
   -- Loop a scenic clip behind the icons: your own drops, or Apple Aerials.
-  local vid = { { title = "Off", checked = (self._wp == nil),
-    fn = function() self:_setWallpaper(nil) end }, { title = "-" } }
-  local clips = self:_wallpapers()
-  if #clips == 0 then
-    vid[#vid + 1] = { title = "No clips yet — add .mp4/.mov, or sync aerials below", disabled = true }
-  else
-    for _, name in ipairs(clips) do
-      vid[#vid + 1] = { title = name:gsub("%.%w+$", ""), checked = (self._wp == name),
-        fn = function() self:_setWallpaper(name) end }
-    end
-  end
-  vid[#vid + 1] = { title = "-" }
   local spd = {}
   for _, r in ipairs(WP_SPEEDS) do
     spd[#spd + 1] = { title = (r == 1.0 and "Normal" or (tostring(r) .. "×")),
       checked = (math.abs(r - self._wpSpeed) < 0.001),
       fn = function() self:_setWallpaperSpeed(r) end }
   end
-  vid[#vid + 1] = { title = "Speed", menu = spd, checked = (self._wpSpeed ~= 1.0) }
-  vid[#vid + 1] = { title = "Pause on battery", checked = self._wpPauseBattery,
+  local cadence = {}
+  for _, minutes in ipairs(WP_CHANGE_MINUTES) do
+    cadence[#cadence + 1] = {
+      title = minutes == 0 and "Never — loop selected" or ("Every " .. minutes .. " minutes"),
+      checked = (minutes == self._wpChangeMinutes),
+      fn = function() self:_setWallpaperChangeMinutes(minutes) end,
+    }
+  end
+  local clips = self:_wallpapers()
+  local vid = {
+    { title = "Turn video desktop off", checked = (self._wp == nil),
+      fn = function() self:_setWallpaper(nil) end },
+    { title = "Speed", menu = spd, checked = (self._wpSpeed ~= 1.0) },
+    { title = "Change desktop", menu = cadence, checked = (self._wpChangeMinutes > 0) },
+    { title = "Shuffle now", disabled = (#clips == 0), fn = function() self:_shuffleWallpaper() end },
+    { title = "Pause on battery", checked = self._wpPauseBattery,
     fn = function()
       self._wpPauseBattery = not self._wpPauseBattery
       hs.settings.set("klonk.wppausebattery", self._wpPauseBattery)
       self:_applyWallpaper()
     end }
+  }
   vid[#vid + 1] = { title = "Sync Apple aerials now", fn = function()
     local n = self:_syncAerials()
     hs.alert.show(n > 0
@@ -573,11 +614,23 @@ function obj:_menuItems()
   vid[#vid + 1] = { title = "Add your own clips…", fn = function()
     local d = self:_wpDir(); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
   end }
+  vid[#vid + 1] = { title = "-" }
+  if #clips == 0 then
+    vid[#vid + 1] = { title = "No clips yet — add .mp4/.mov, or sync aerials above", disabled = true }
+  else
+    for _, name in ipairs(clips) do
+      vid[#vid + 1] = { title = name:gsub("%.%w+$", ""), checked = (self._wp == name),
+        fn = function() self:_setWallpaper(name) end }
+    end
+  end
 
   -- ---- Top level: three groups, active state shown by a group checkmark ----
   return {
     { title = hs.styledtext.new("klonk", { font = { name = "Menlo-Bold", size = 11 },
         color = { white = 0.5 } }), disabled = true },
+    { title = "-" },
+    { title = self._audioMuted and "All sounds on" or "All sounds off",
+      fn = function() self:_setAudioMuted(not self._audioMuted) end },
     { title = "-" },
     { title = "Keyboard sounds", menu = kb,  checked = self._on },
     { title = "Ambient sounds",  menu = amb, checked = (self._bed ~= nil) },
@@ -589,7 +642,17 @@ end
 --- Method
 --- Toggles all sounds on/off (the master switch).
 function obj:toggle()
-  self._on = not self._on; self:_refresh(); return self
+  self:_setAudioMuted(not self._audioMuted); return self
+end
+
+function obj:_setAudioMuted(muted)
+  self._audioMuted = muted
+  if muted then
+    if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
+  elseif self._bed then
+    self:_playBed(self._bed)
+  end
+  self:_refresh()
 end
 
 --- Klonk:toggleMouse()
@@ -632,6 +695,7 @@ end
 --- Installs the menu-bar item and the keystroke listener. Restores your last
 --- set / volume / on-state from `hs.settings`.
 function obj:start()
+  self._audioMuted = hs.settings.get("klonk.audiomuted") or false
   self._on = hs.settings.get("klonk.on"); if self._on == nil then self._on = true end
   self._mouse = hs.settings.get("klonk.mouse"); if self._mouse == nil then self._mouse = true end
   self._vol = hs.settings.get("klonk.vol") or 0.7
@@ -701,6 +765,7 @@ function obj:start()
   -- on screen-layout / battery changes so the clip tracks the live geometry.
   self._wpPauseBattery = hs.settings.get("klonk.wppausebattery") or false
   self._wpSpeed = hs.settings.get("klonk.wpspeed") or 1.0
+  self._wpChangeMinutes = hs.settings.get("klonk.wpchangeminutes") or 0
   self._wp = hs.settings.get("klonk.wallpaper")
   self:_syncAerials()
   self._wpScreen = self._wpScreen or hs.screen.watcher.new(function() self:_applyWallpaper() end):start()
@@ -708,6 +773,7 @@ function obj:start()
     if self._wpPauseBattery then self:_applyWallpaper() end
   end):start()
   self:_applyWallpaper()
+  self:_restartWallpaperTimer()
 
   self:_refresh()
   return self
@@ -719,6 +785,7 @@ end
 function obj:stop()
   if self._tap then self._tap:stop(); self._tap = nil end
   if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
+  if self._wpChangeTimer then self._wpChangeTimer:stop(); self._wpChangeTimer = nil end
   self:_tearDownWallpaper()
   if self._wpScreen then self._wpScreen:stop(); self._wpScreen = nil end
   if self._wpBattery then self._wpBattery:stop(); self._wpBattery = nil end

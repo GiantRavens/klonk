@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build a self-contained HTML demo of the klonk sound sets.
 
-Reads Klonk.spoon/sounds/, base64-embeds every WAV, and emits previews/gallery.html
+Reads the bundled sets plus preview-only recorded keyboards, base64-embeds every
+WAV, and emits previews/gallery.html
 — a page with a "type here" box that plays the selected set as you type, entirely
 client-side (no server, no external files). Rerun after regenerating sounds.
 
@@ -10,7 +11,10 @@ client-side (no server, no external files). Rerun after regenerating sounds.
 import base64, json, os, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOUNDS = os.path.join(ROOT, "Klonk.spoon", "sounds")
+SOUND_DIRS = [
+    os.path.join(ROOT, "previews", "recorded-keyboards"),
+    os.path.join(ROOT, "Klonk.spoon", "sounds"),
+]
 OUT = os.path.join(ROOT, "previews", "gallery.html")
 
 def datauri(path):
@@ -18,26 +22,32 @@ def datauri(path):
         return "data:audio/wav;base64," + base64.b64encode(f.read()).decode()
 
 sets = {}
-for name in sorted(os.listdir(SOUNDS)):
-    d = os.path.join(SOUNDS, name)
-    if not os.path.isdir(d) or name.startswith((".", "_")):
+for sounds_dir in SOUND_DIRS:
+    if not os.path.isdir(sounds_dir):
         continue
-    entry = {"down": [], "up": []}
-    for f in sorted(os.listdir(d)):
-        if not f.endswith(".wav"):
+    for name in sorted(os.listdir(sounds_dir)):
+        d = os.path.join(sounds_dir, name)
+        if not os.path.isdir(d) or name.startswith((".", "_")) or name in sets:
             continue
-        stem = f[:-4].rstrip("0123456789")
-        uri = datauri(os.path.join(d, f))
-        if stem in ("down", "up"):
-            entry[stem].append(uri)
-        elif stem in ("space", "enter", "backspace"):
-            entry[stem] = uri
-    sets[name] = entry
+        entry = {"down": [], "up": []}
+        for f in sorted(os.listdir(d)):
+            if not f.endswith(".wav"):
+                continue
+            stem = f[:-4].rstrip("0123456789")
+            uri = datauri(os.path.join(d, f))
+            if stem in ("down", "up"):
+                entry[stem].append(uri)
+            elif stem in ("space", "enter", "backspace"):
+                entry[stem] = uri
+        sets[name] = entry
 
 # rough per-family labels for the chips
 FAMILY = {
-    "thock": "synth · deep", "crystal": "synth · glass tings", "typewriter": "synth · Selectric",
-    "telegraph": "recorded · sounder", "console": "synth · 8-bit", "trek": "synth · LCARS",
+    "thock": "synth · deep", "crystal": "synth · glass tings",
+    "telegraph": "recorded · sounder", "console": "synth · 8-bit",
+    "ping-pong": "recorded · sports", "tennis": "recorded · sports",
+    "blues": "recorded · Cherry MX Blue", "browns": "recorded · Cherry MX Brown",
+    "pandas": "recorded · Holy Panda",
     "vibraphone": "musical · pentatonic", "kalimba": "musical · pentatonic",
     "harpsichord": "musical · pentatonic", "jazzy": "musical · pentatonic",
 }
@@ -72,6 +82,7 @@ html = """<!doctype html>
              font: 16px/1.6 ui-monospace, Menlo, monospace; resize: vertical; outline: none; }
   textarea:focus { border-color: #6b7480; }
   .hint { color: #6b7280; font-size: 13px; margin-top: 12px; text-align: center; }
+  .recorded { color: #9aa0a8; font-size: 13px; margin: 18px 0 0; text-align: center; }
   .row { display: flex; align-items: center; gap: 14px; margin-top: 18px; justify-content: center; }
   input[type=range] { accent-color: #e7e9ec; }
   a { color: #7ab7ff; }
@@ -88,6 +99,13 @@ html = """<!doctype html>
       <input type="range" id="vol" min="0" max="1" step="0.05" value="0.7">
     </div>
     <p class="hint">Same engine as the Hammerspoon Spoon: a set is just a folder of WAVs.</p>
+    <p class="recorded"><strong>Recording credits:</strong> Cherry MX Blue and Brown by
+      <a href="https://github.com/hainguyents13">Hải Nguyễn</a>; Holy Panda by
+      <a href="https://github.com/tplai/kbsim">Thomas Lai</a>, adapted for Mechvibes by
+      <a href="https://github.com/withinboredom">Rob Landers</a>.</p>
+    <p class="recorded">Want more real switch recordings? Start with the
+      <a href="https://github.com/hainguyents13/mechvibes">Mechvibes packs on GitHub</a>,
+      then follow Klonk's <a href="https://github.com/giantravens/klonk#real-recorded-keyboards">recorded-keyboard import guide</a>.</p>
   </div>
   <footer>Built by <code>tools/build_gallery.py</code> · synthesized sets are CC0 ·
     <a href="https://github.com/giantravens/klonk">github.com/giantravens/klonk</a></footer>

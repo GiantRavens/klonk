@@ -30,7 +30,9 @@ ship dedicated `click` / `clickup` / `rightclick` / `scroll` WAVs to give the
 mouse its own voice.
 
 ▶️ **[Try it in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
-pick a set and type; it runs the same logic client-side, no install.
+pick a set and type; it runs the same logic client-side, no install. The test page
+includes Cherry MX Blue, Cherry MX Brown, and Holy Panda recordings so you can
+compare real switches before importing a pack.
 
 ---
 
@@ -66,7 +68,11 @@ ships. It scans **both** places macOS keeps them:
 > aerials now* and it appears in your picker. Names come from Apple's own catalogs;
 > a brand-new aerial not yet catalogued shows as its raw UUID (it still plays).
 
-**Slow motion.** The **Speed** submenu — Normal / 0.5× / 0.25× / 0.1× — sets the
+**Loop or rotate.** By default, the chosen desktop loops continuously. **Shuffle
+now** picks a different clip immediately; **Change desktop** can keep looping the
+selection or choose a different clip every 20, 60, or 120 minutes.
+
+**Slow motion.** The **Speed** submenu — Normal / 0.5× / 0.25× / 0.1× / 0.05× — sets the
 clip's `playbackRate`. Apple's Aerials are high-bitrate cinematic drone footage, so
 0.25× drifts by dreamily instead of stuttering. Speed changes apply *live* to the
 running wallpaper (no restart) and are remembered.
@@ -101,9 +107,11 @@ spoon.Klonk:bindHotkeys({
 })
 ```
 
-Reload Hammerspoon. A keyboard icon appears in the menu bar; clicking it opens the
-three groups — **Keyboard sounds**, **Ambient sounds**, and **Video desktop** —
-each remembering your choice across restarts.
+Reload Hammerspoon. A keyboard icon appears in the menu bar. **All sounds off**
+mutes keyboard, mouse, and ambient audio together without forgetting the selected
+set or bed. The three groups — **Keyboard sounds**, **Ambient sounds**, and
+**Video desktop** — put controls first and choosable sounds/media after them, and
+remember your choices across restarts.
 
 macOS will ask to grant Hammerspoon **Accessibility** permission (needed to hear
 keystrokes); klonk only *listens* — it never intercepts or alters your typing.
@@ -112,14 +120,14 @@ keystrokes); klonk only *listens* — it never intercepts or alters your typing.
 
 ## The built-in sets
 
-Nine sets are synthesized from scratch by `tools/generate.py`; Telegraph is
-curated from recorded sounder actions:
+Eight sets are synthesized from scratch by `tools/generate.py`; Telegraph,
+Ping Pong, and Tennis are curated from recordings:
 
 | Family | Sets | Character |
 |---|---|---|
-| Percussive | `thock` `crystal` `typewriter` | deep contact, glass/crystal tings, and Selectric character |
+| Percussive | `thock` `crystal` | deep contact and glass/crystal tings |
 | Mechanical | `telegraph` `console` | recorded sounder actions and chunky old-school console beeps/bops |
-| Tonal | `trek` | pitched glides — LCARS-style blips |
+| Keyboard samples | `ping-pong` `tennis` | recorded table-tennis bounces and tennis-ball impacts |
 | Musical | `vibraphone` `kalimba` `harpsichord` `jazzy` | notes from a **minor-pentatonic** scale, so random keypresses improvise a melody |
 
 ## Add your own sets
@@ -148,7 +156,7 @@ the whole convention (keys **and** mouse voices) in one shot:
 
 ```sh
 python3 tools/make_set.py ~/sounds/paper calligraph    # -> ~/Music/Klonk/Sounds/calligraph
-python3 tools/make_set.py ~/trek lcars --enter "Working.m4a" --space "Door Chime.aif"
+python3 tools/make_set.py ~/sounds/console console-ui --enter "Working.m4a" --space "Door Chime.aif"
 ```
 
 It **prints a manifest first** — every input's duration and attack, then which
@@ -238,10 +246,17 @@ across restarts.
 
 ## Real recorded keyboards
 
-`tools/import_pack.py` pulls real recorded switch packs from
-[Mechvibes](https://github.com/hainguyents13/mechvibes) (MIT) and slices them
-into Klonk sets in `~/Music/Klonk/Sounds/` — it also downloads a CC0 typewriter bell
-and can optionally bake it into a set's Return:
+The easiest source is the open-source
+[Mechvibes sound-pack library on GitHub](https://github.com/hainguyents13/mechvibes).
+Its packs contain recordings of real switches such as Cherry MX Blue, Cherry MX
+Brown, and Holy Panda. **Recording credits:** the Cherry MX Blue and Cherry MX
+Brown packs are by [Hải Nguyễn](https://github.com/hainguyents13), creator of
+Mechvibes. The Holy Panda recordings are by
+[Thomas Lai](https://github.com/tplai/kbsim); [Rob Landers](https://github.com/withinboredom)
+adapted that pack for Mechvibes. You do not need to find or rearrange the audio yourself:
+`tools/import_pack.py` downloads a named pack, converts it to Klonk's WAV layout,
+and installs it in `~/Music/Klonk/Sounds/`. It can also download a CC0 typewriter
+bell and bake it into a set's Return:
 
 ```sh
 python3 tools/import_pack.py cherrymx-blue-pbt  blues
@@ -249,9 +264,11 @@ python3 tools/import_pack.py cherrymx-brown-pbt browns
 python3 tools/import_pack.py holy-pandas        pandas
 ```
 
-It handles both Mechvibes formats (single-file sprites and per-key "multi"
-packs). Requires `ffmpeg` (`brew install ffmpeg`). Imported audio lands in your
-personal dir, never in this repo.
+Run those commands from the cloned Klonk repository. The importer handles both
+Mechvibes formats (single-file sprites and per-key "multi" packs). It requires
+`ffmpeg` (`brew install ffmpeg`). Imported audio lands in your personal library,
+never in this repo; reopen **Keyboard sounds** after import and the new set is
+ready to choose. The browser test page links back to this guide as well.
 
 ## Tune the synthesized sets
 
@@ -288,8 +305,8 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
   round-robins through, letting fast keystrokes ring out and overlap into a wash.
   The bank size is sized to each sound's own length (≈one voice per 0.1s, capped
   at `Klonk.voices`, default 6): a short recorded-keyboard clack resolves to a
-  single crisp voice, while a long sample (calligraph, splash, kalimba, the LCARS
-  console) fans out and layers. Drop a `voices` file (one integer) in a set folder
+  single crisp voice, while a long sample (kalimba, ping-pong, tennis) fans out
+  and layers. Drop a `voices` file (one integer) in a set folder
   to pin it — `import_pack.py` writes `1` so real keyboards stay crisp.
 - **Mouse for free.** The same `eventtap` also taps left/right mouse and scroll.
   A click plays through a `click`→`down` fallback chain and a scroll through
@@ -308,8 +325,14 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
 ## License & credits
 
 - **Code** (`Klonk.spoon/init.lua`, `tools/`): MIT — see [LICENSE](LICENSE).
-- **Bundled sounds** (`Klonk.spoon/sounds/`): synthesized originals, released
-  **CC0** (public domain) — use them anywhere.
+- **Synthesized bundled sounds** (`Klonk.spoon/sounds/`): originals released
+  **CC0** (public domain) — use them anywhere. Recorded sets carry a `SOURCE.txt`
+  beside their audio.
+- **Recorded-keyboard previews** (`previews/recorded-keyboards/`): Cherry MX Blue
+  and Brown recordings by [Hải Nguyễn](https://github.com/hainguyents13); Holy
+  Panda recordings by [Thomas Lai](https://github.com/tplai/kbsim), adapted for
+  Mechvibes by [Rob Landers](https://github.com/withinboredom). The MIT-licensed
+  packs are converted and embedded in the browser test, not installed with the Spoon.
 - **`import_pack.py`** downloads, into *your* machine, third-party audio you
   should credit yourself: Mechvibes packs (MIT,
   [hainguyents13/mechvibes](https://github.com/hainguyents13/mechvibes)) and a

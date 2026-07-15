@@ -25,7 +25,7 @@
       {
         "name": "toggle",
         "def": "Klonk:toggle()",
-        "doc": "Toggles keystroke sounds on/off.",
+        "doc": "Toggles keyboard, mouse, and ambient sounds together without forgetting their selections.",
         "type": "Method"
       },
       {

@@ -20,6 +20,22 @@ import json, math, os, re, struct, subprocess, sys, tempfile, wave, random
 SR = 44100
 REPO = "https://raw.githubusercontent.com/hainguyents13/mechvibes/main/src/audio"
 BELL_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2844.wav"   # CC0 Hermes Precisa 305
+PACK_CREDITS = {
+    "cherrymx-blue-pbt": (
+        "Recording/pack creator: Hải Nguyễn (@hainguyents13)\n"
+        "https://github.com/hainguyents13\n"
+    ),
+    "cherrymx-brown-pbt": (
+        "Recording/pack creator: Hải Nguyễn (@hainguyents13)\n"
+        "https://github.com/hainguyents13\n"
+    ),
+    "holy-pandas": (
+        "Recording creator: Thomas Lai (@tplai), from kbsim\n"
+        "https://github.com/tplai/kbsim\n"
+        "Mechvibes adaptation: Rob Landers (@withinboredom)\n"
+        "https://github.com/withinboredom\n"
+    ),
+}
 pack = sys.argv[1] if len(sys.argv) > 1 else "cherrymx-blue-pbt"
 setname = sys.argv[2] if len(sys.argv) > 2 else "blues"
 # imported sets land in your personal klonk dir (not the shipped Spoon), so
@@ -203,6 +219,7 @@ with tempfile.TemporaryDirectory() as tmp:
     with open(os.path.join(out, "SOURCE.txt"), "w") as f:
         f.write(f"Set '{setname}' imported from Mechvibes pack '{pack}' ({dtype})\n"
                 f"{REPO}/{pack}/\nLicense: MIT (github.com/hainguyents13/mechvibes)\n"
+                f"{PACK_CREDITS.get(pack, '')}"
                 f"enter.wav mixes in {'the REAL CC0 typewriter bell (_bell.wav)' if REAL_BELL else 'a synthesized bell'}.\n")
 
 print(f"  {setname}: {len([x for x in os.listdir(out) if x.endswith('.wav')])} WAVs "

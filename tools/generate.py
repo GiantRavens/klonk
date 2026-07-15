@@ -83,17 +83,6 @@ SETS = {
         "rightclick": (0.08,  (0.85, 4200, 0.011),[(1700, .5, .022), (2700, .28, .014)], 0.95),
         "scroll":     (0.025, (0.6, 7000, 0.004), [(4000, .18, .005)], 0.30),
     },
-    "typewriter": {  # inharmonic metal — Selectric energy, bell on Enter
-        "down":      (0.14, (0.8, 4000, 0.012), [(1250, .4, .05), (2650, .35, .035), (4150, .25, .02), (600, .2, .03)], 0.95),
-        "up":        (0.05, (0.5, 5000, 0.006), [(1800, .2, .012)], 0.35),
-        "space":     (0.18, (1.0, 500, 0.030),  [(180, .7, .06), (90, .4, .08)], 1.1),
-        "enter":     (0.45, (0.7, 3000, 0.015), [(1250, .3, .04), (3135, .3, .30), (4700, .15, .22)], 1.0),  # ding!
-        "backspace": (0.12, (0.8, 4500, 0.010), [(1500, .4, .04), (3000, .25, .025)], 0.9),
-        "click":      (0.10, (0.9, 3000, 0.011), [(900, .4, .03), (1800, .3, .02), (450, .25, .03)], 0.95),  # lever chunk
-        "clickup":    (0.05, (0.5, 4500, 0.006), [(1500, .2, .012)], 0.35),
-        "rightclick": (0.12, (0.9, 2500, 0.013), [(700, .4, .035), (1400, .25, .02)], 0.95),
-        "scroll":     (0.03, (0.6, 5000, 0.005), [(2000, .18, .006)], 0.30),
-    },
 }
 # click/scroll get randomized variants (they repeat a lot); clickup/rightclick
 # render once. MOUSE_KEYS drives the additive `--mouse` regen.
@@ -102,11 +91,10 @@ MOUSE_KEYS = {"click", "clickup", "rightclick", "scroll"}
 
 # Per-set Return ding, baked INTO that set's enter.wav (no universal overlay).
 # (f0, dur, level) for a struck bell mixed over the enter keystroke; None means
-# the set's enter is already its own flourish (typewriter bell / tonal / music).
+# the set's enter is already its own flourish (tonal / music).
 DINGS = {
     "thock":      (523, 1.10, 0.45),   # soft low bell — matches the creamy body
     "crystal":    (880, 0.90, 0.45),   # bright crystal flourish
-    "typewriter": None,                # its enter already rings
 }
 
 # --- OUR ding: a struck service bell -----------------------------------------
@@ -196,14 +184,6 @@ def synth_mech(dur, thump, impact, ring, strike2=None, sat=2.5, level=0.72):
     peak = max((abs(s) for s in out), default=1.0) or 1.0
     return [s * level / peak for s in out]
 
-# --- tonal sets (Trek blips, water drops) ------------------------------------
-# These are PITCHED, not percussive, so they get their own synth. Phase is
-# accumulated (not f*t) so a pitch glide bends smoothly with no click.
-def _wave(phase, shape):
-    if shape == "tri":  return 2/math.pi * math.asin(math.sin(phase))
-    if shape == "sqr":  return 0.9 if math.sin(phase) >= 0 else -0.9
-    return math.sin(phase)                                   # default sine
-
 def finish(out, level, ta=0.0008, td=0.005):
     n = len(out)
     for i in range(n):
@@ -215,60 +195,12 @@ def finish(out, level, ta=0.0008, td=0.005):
     peak = max((abs(s) for s in out), default=1.0) or 1.0
     return [s * level / peak for s in out]
 
-def glide(f0, f1, dur, shape="sine", dec=None, level=0.6):
-    dec, n, phase, out = dec or dur * 0.5, int(SR * dur), 0.0, []
-    for i in range(n):
-        t = i / SR
-        f = f0 * (f1 / f0) ** (t / dur)                      # exp glide f0→f1
-        phase += 2 * math.pi * f / SR
-        out.append(_wave(phase, shape) * math.exp(-t / dec))
-    return finish(out, level)
-
-def two_tone(fa, fb, dur, shape="tri", gap=0.5, level=0.6):
-    """Two stacked blips — LCARS 'confirm' feel. gap = fraction before 2nd."""
-    a = glide(fa, fa, dur * gap, shape, dur * gap * 0.6, level)
-    b = glide(fb, fb, dur * (1 - gap), shape, dur * (1 - gap) * 0.6, level)
-    return a + b
-
-# spec: key -> (callable, kwargs). down/up jitter freq per variant so repeats
-# aren't identical. Frequencies chosen to sit in the "friendly UI chirp" band.
-THEMED = {
-    "trek": {   # LCARS console — soft triangle blips, tuned like TNG panels
-        "down":      (glide, dict(f0=760, f1=880,  dur=0.075, shape="tri", level=0.5)),
-        "up":        (glide, dict(f0=1180, f1=1180, dur=0.045, shape="sine", level=0.28)),
-        "space":     (glide, dict(f0=540, f1=640,  dur=0.10,  shape="tri", level=0.55)),
-        "enter":     (two_tone, dict(fa=680, fb=1020, dur=0.16, shape="tri", level=0.6)),
-        "backspace": (glide, dict(f0=900, f1=560,  dur=0.09,  shape="tri", level=0.5)),  # falling = "undo"
-        "click":      (glide, dict(f0=520, f1=600, dur=0.075, shape="tri", level=0.55)),          # button boop
-        "clickup":    (glide, dict(f0=900, f1=900, dur=0.04, shape="sine", level=0.26)),
-        "rightclick": (two_tone, dict(fa=600, fb=440, dur=0.12, shape="tri", gap=0.5, level=0.55)),  # menu (descending)
-        "scroll":     (glide, dict(f0=1300, f1=1300, dur=0.03, shape="sine", dec=0.012, level=0.22)),
-    },
-}
-
 def tag(d, cat):
     """Declare the set's family (a one-word `category` file in the set folder).
     The generator knows what it synthesized; the menu groups by reading this —
     no hardcoded name→group map to drift out of date."""
     with open(os.path.join(d, "category"), "w") as f:
         f.write(cat + "\n")
-
-def render_themed(base, only=None):
-    for set_name, keys in THEMED.items():
-        d = os.path.join(base, set_name)
-        os.makedirs(d, exist_ok=True)
-        tag(d, "themed")
-        for key, (fn, kw) in keys.items():
-            if only and key not in only: continue
-            for v in range(1, VARIANTS.get(key, 1) + 1):
-                random.seed(hash((set_name, key, v)))
-                k = dict(kw)
-                jf = random.uniform(0.95, 1.05)              # ±5% per-variant pitch
-                for fk in ("f0", "f1", "fa", "fb"):
-                    if fk in k: k[fk] *= jf
-                name = f"{key}{v}.wav" if key in VARIANTS else f"{key}.wav"
-                write_wav(os.path.join(d, name), fn(**k))
-        print(f"  {set_name}: {len(os.listdir(d))} files")
 
 # --- MUSICAL sets: typing plays a melody --------------------------------------
 # The trick: draw notes from a MINOR PENTATONIC scale. It has no minor-2nd or
@@ -512,7 +444,6 @@ def main():
                 write_wav(os.path.join(d, name), s)
         print(f"  {set_name}: {len(os.listdir(d))} files")
     render_mech(base, only)
-    render_themed(base, only)
     render_musical(base, only)
     if not only:
         render_ambient(base)
