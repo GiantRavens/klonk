@@ -5,7 +5,7 @@
       {
         "name": "soundDirs",
         "def": "Klonk.soundDirs",
-        "doc": "List of directories scanned for sound sets. Set before :start() to customize. Defaults to the bundled sounds/ plus ~/.klonk/sounds. Earlier directories win.",
+        "doc": "List of directories scanned for sound sets. Set before :start() to customize. Defaults to bundled sounds/, ~/Music/Klonk/Sounds, and the legacy ~/.klonk/sounds fallback. Earlier directories win.",
         "type": "Variable"
       }
     ],
@@ -47,7 +47,7 @@
     "Deprecated": [],
     "name": "Klonk",
     "desc": "Mechanical keystroke sounds for macOS — any sound set is a folder of WAVs.",
-    "doc": "Mechanical keystroke sounds for macOS, in any voice you like. A sound set is just a folder of WAVs, so synthesized sets, real recorded keyboards, and anything you drop in all play the same way. Every set rings a Return ding baked into its own enter.wav. Menu-bar controlled.",
+    "doc": "Mechanical keystroke sounds for macOS, in any voice you like. A sound set is just a folder of WAVs, so synthesized sets, real recorded keyboards, and anything you drop in all play the same way. Each set can give Return its own flourish through enter.wav. Menu-bar controlled.",
     "items": []
   }
 ]

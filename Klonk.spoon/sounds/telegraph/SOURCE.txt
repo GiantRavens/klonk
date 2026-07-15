@@ -1,0 +1,10 @@
+Recorded Telegraph set curated from:
+
+- retro-terminals assets/sounds/sfx/telegraph.m4a
+- retro-terminals assets/sounds/sfx/telegraph2.m4a
+- retro-terminals assets/sounds/sfx/telegraph3.m4a
+
+The first two recordings provide short armature strikes for typing and mouse
+events. The third provides the longer physical actions reserved for Space and
+Return. Sources were decoded to mono 44.1 kHz, transient-trimmed, faded, and
+peak-normalized with tools/make_set.py. No synthetic bell is mixed into Return.

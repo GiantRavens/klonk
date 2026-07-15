@@ -72,7 +72,7 @@ SETS = {
         "rightclick": (0.12, (1.0, 520, 0.022),  [(105, .72, .055), (160, .4, .035)], 1.05),                # deeper
         "scroll":     (0.03, (0.5, 1200, 0.004), [(300, .15, .006)], 0.30),                                 # tiny detent
     },
-    "clicky": {  # bright, tactile — MX Blue energy
+    "crystal": {  # bright glass/crystal tings — precise, resonant, jewel-like
         "down":      (0.06, (0.7, 5500, 0.008), [(2300, .45, .018), (3600, .3, .012), (1200, .2, .02)], 0.9),
         "up":        (0.04, (0.5, 6500, 0.005), [(3000, .25, .01)], 0.35),
         "space":     (0.08, (0.8, 3500, 0.012), [(1700, .5, .02), (900, .3, .025)], 1.0),
@@ -105,7 +105,7 @@ MOUSE_KEYS = {"click", "clickup", "rightclick", "scroll"}
 # the set's enter is already its own flourish (typewriter bell / tonal / music).
 DINGS = {
     "thock":      (523, 1.10, 0.45),   # soft low bell — matches the creamy body
-    "clicky":     (880, 0.90, 0.45),   # bright ping
+    "crystal":    (880, 0.90, 0.45),   # bright crystal flourish
     "typewriter": None,                # its enter already rings
 }
 
@@ -244,17 +244,6 @@ THEMED = {
         "rightclick": (two_tone, dict(fa=600, fb=440, dur=0.12, shape="tri", gap=0.5, level=0.55)),  # menu (descending)
         "scroll":     (glide, dict(f0=1300, f1=1300, dur=0.03, shape="sine", dec=0.012, level=0.22)),
     },
-    "water": {  # drip-drop — fast UPWARD pitch bend is the whole illusion
-        "down":      (glide, dict(f0=430, f1=1150, dur=0.11, shape="sine", dec=0.045, level=0.55)),
-        "up":        (glide, dict(f0=900, f1=1500, dur=0.05, shape="sine", dec=0.02,  level=0.25)),
-        "space":     (glide, dict(f0=300, f1=820,  dur=0.16, shape="sine", dec=0.07,  level=0.6)),   # fat plop
-        "enter":     (glide, dict(f0=240, f1=680,  dur=0.20, shape="sine", dec=0.09,  level=0.6)),   # deep plunk
-        "backspace": (glide, dict(f0=520, f1=1050, dur=0.09, shape="sine", dec=0.035, level=0.5)),
-        "click":      (glide, dict(f0=340, f1=900,  dur=0.12,  shape="sine", dec=0.05, level=0.58)),  # fat plop
-        "clickup":    (glide, dict(f0=950, f1=1500, dur=0.045, shape="sine", dec=0.02, level=0.24)),
-        "rightclick": (glide, dict(f0=280, f1=760,  dur=0.14,  shape="sine", dec=0.06, level=0.58)),  # deeper plunk
-        "scroll":     (glide, dict(f0=1100, f1=1500, dur=0.03, shape="sine", dec=0.012, level=0.22)),
-    },
 }
 
 def tag(d, cat):
@@ -375,33 +364,12 @@ def render_musical(base, only=None):
         print(f"  {name}: {len(os.listdir(d))} files")
 
 # --- MECHANICAL sets: rendered by synth_mech, not the sine-stack synth --------
-# Each key is synth_mech kwargs. "ding" (f0,dur,level) bakes a bell into enter.
+# Each key is synth_mech kwargs. An optional "ding" bakes a bell into enter;
+# Return behavior is an artistic choice per set, not a global convention.
 MECH = {
-    "telegraph": {   # sounder armature slamming brass — a solid low KATHUNK
-        "ding": (880, 0.55, 0.38),   # small office bell on Return
-        "keys": {
-            "down":      dict(dur=0.14, thump=(230,140,0.95,0.055), impact=(1.0,2600,0.006),
-                              ring=[(680,.45,.05),(1350,.28,.03),(2050,.15,.02)], sat=3.0, level=0.82),
-            "up":        dict(dur=0.10, thump=(370,270,0.6,0.030), impact=(0.8,3400,0.005),
-                              ring=[(1150,.4,.03),(2200,.2,.018)], sat=2.5, level=0.60),   # lighter release clack
-            "space":     dict(dur=0.16, thump=(185,120,1.05,0.070), impact=(1.0,2200,0.007),
-                              ring=[(560,.4,.05),(1080,.22,.03)], sat=3.0, level=0.88),     # deepest thunk
-            "enter":     dict(dur=0.14, thump=(230,140,0.9,0.050), impact=(0.95,2600,0.006),
-                              ring=[(700,.4,.05),(1400,.24,.03)], sat=3.0, level=0.80),
-            "backspace": dict(dur=0.12, thump=(280,175,0.85,0.040), impact=(0.9,3000,0.006),
-                              ring=[(900,.4,.04),(1800,.2,.02)], sat=2.8, level=0.72),
-            "click":      dict(dur=0.15, thump=(210,130,1.0,0.06), impact=(1.0,2400,0.007),
-                               ring=[(600,.45,.05),(1200,.28,.03)], sat=3.0, level=0.85),   # relay thunk
-            "clickup":    dict(dur=0.09, thump=(360,260,0.55,0.028), impact=(0.8,3400,0.005),
-                               ring=[(1100,.4,.03)], sat=2.5, level=0.55),
-            "rightclick": dict(dur=0.16, thump=(180,115,1.05,0.07), impact=(1.0,2100,0.008),
-                               ring=[(520,.42,.055),(1000,.22,.03)], sat=3.0, level=0.85),
-            "scroll":     dict(dur=0.05, thump=(500,380,0.4,0.015), impact=(0.6,4000,0.004),
-                               ring=[(1600,.25,.01)], sat=2.0, level=0.4),                   # light ratchet
-        },
-    },
-    "manual": {   # heavy manual typewriter — type-bar SLAP then hammer (ka-thunk)
-        "ding": (700, 1.10, 0.5),    # hearty carriage return bell
+    # Telegraph is a curated recorded set and is deliberately not regenerated.
+    "console": {   # old-school console: chunky 8-bit-flavored beeps and bops
+        "ding": None,  # Return keeps its drum-pad action without a bell overlay
         "keys": {
             "down":      dict(dur=0.16, thump=(190,120,0.9,0.050), impact=(1.0,2400,0.007),
                               ring=[(520,.4,.05),(1100,.3,.03),(1900,.16,.02)],
@@ -548,7 +516,7 @@ def main():
     render_musical(base, only)
     if not only:
         render_ambient(base)
-        print("  (each set's Return ding is baked into its own enter.wav)")
+        print("  (Return flourishes are defined independently by each set)")
 
 if __name__ == "__main__":
     main()

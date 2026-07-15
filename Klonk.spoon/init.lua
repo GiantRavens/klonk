@@ -1,10 +1,15 @@
 --- === Klonk ===
 ---
---- Mechanical keystroke sounds for macOS — in any voice you like.
+--- Desktop ambiance for macOS — mechanical keystroke sounds, ambient beds, and a
+--- looping video desktop, all from one menu-bar icon.
+---
+--- Three groups share the same "folder is the config" idea: a keyboard sound set
+--- is a folder of WAVs, an ambient bed is a loopable audio file, and a video
+--- desktop is a clip you drop in (or an Apple Aerial symlinked in for free).
 ---
 --- A "sound set" is just a folder of WAVs, so the built-in synthesized sets,
 --- real recorded keyboards, and anything you drop in all play the same way.
---- Every set rings a Return "ding" baked into its own `enter.wav`.
+--- Every set can give Return its own flourish through `enter.wav`.
 ---
 --- Mouse clicks and scrolling ring too: a click is just a down+up, so every set
 --- gets mouse sounds for free from its `down`/`up` pool. A set can also ship
@@ -13,7 +18,7 @@
 ---
 --- The menu-bar shows a keyboard icon (dims + slashes when muted). Click it to
 --- toggle sound, toggle mouse clicks, pick a set, or set the volume. Sets are
---- scanned from the bundled `sounds/` folder plus `~/.klonk/sounds` (your own).
+--- scanned from the bundled `sounds/` folder plus `~/Music/Klonk/Sounds`.
 ---
 --- Download: https://github.com/giantravens/klonk
 
@@ -21,7 +26,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "Klonk"
-obj.version = "1.0"
+obj.version = "2.0"
 obj.author = "Skip Levens"
 obj.homepage = "https://github.com/giantravens/klonk"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
@@ -29,9 +34,8 @@ obj.license = "MIT - https://opensource.org/licenses/MIT"
 --- Klonk.soundDirs
 --- Variable
 --- List of directories scanned for sound sets. Set before `:start()` to
---- customize. Defaults to the bundled `sounds/` plus `~/.klonk/sounds`. Earlier
---- directories win, so a set in your own dir overrides a bundled one of the
---- same name.
+--- customize. Defaults to the bundled `sounds/`, visible `~/Music/Klonk/Sounds`,
+--- and the legacy `~/.klonk/sounds` fallback. Earlier directories win.
 obj.soundDirs = nil
 
 --- Klonk.voices
@@ -49,9 +53,18 @@ obj.voices = 6
 --- Variable
 --- List of directories scanned for ambient beds — single long, loopable audio
 --- files (rain, wind, surf, a bridge hum) that play under your typing. Defaults
---- to the bundled `ambient/` plus `~/.klonk/ambient`. Each file's basename is a
---- bed's menu name.
+--- to the bundled `ambient/`, visible `~/Music/Klonk/Ambience`, and the legacy
+--- `~/.klonk/ambient` fallback. Each file's basename is a bed's menu name.
 obj.ambientDirs = nil
+
+--- Klonk.wallpaperDirs
+--- Variable
+--- List of directories scanned for video-desktop clips — `.mp4/.mov/.m4v` files
+--- that loop behind the desktop icons. Both work: drop your OWN clips in, or let
+--- `_syncAerials()` symlink Apple's downloaded Aerials in for free. Defaults to
+--- `~/Movies/Klonk/Wallpapers`. Each file's basename (minus extension) is a
+--- pick's menu name. Set before `:start()`.
+obj.wallpaperDirs = nil
 
 -- runtime state (underscore-prefixed → not part of the public API)
 obj._menu  = nil
@@ -65,6 +78,9 @@ obj._lastScroll = 0
 obj._bed      = nil     -- current ambient bed name (nil = none)
 obj._bedSound = nil     -- the looping hs.sound object
 obj._bedVol   = 0.5
+obj._wpViews  = {}      -- one webview per screen while a video desktop is active
+obj._wp       = nil     -- current video-desktop clip basename (nil = off)
+obj._wpPauseBattery = false
 
 -- Which dedicated file plays for which macOS key code.
 local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
@@ -75,6 +91,8 @@ local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
 local GENERIC = { up = true, down = true, click = true, clickup = true,
                   rightclick = true, scroll = true }
 local VOLUMES = { 0.3, 0.5, 0.7, 1.0 }
+local SET_ALIASES = { clicky = "crystal", manual = "console",
+                      paper = "calligraph", water = "splash" }
 local SCROLL_GAP = 0.05   -- min seconds between scroll ticks (trackpad throttle)
 
 local function expand(p) return (p:gsub("^~", os.getenv("HOME"))) end
@@ -111,6 +129,7 @@ end
 -- of real switches). The menu groups by reading it, so there's no hardcoded
 -- name→family map to drift; untagged or unknown sets land in "More sets".
 local CATEGORIES = {
+  { key = "environment", label = "Environments"     },
   { key = "samples",    label = "Keyboard samples" },
   { key = "mechanical", label = "Mechanical"       },
   { key = "themed",     label = "Themed"           },
@@ -252,6 +271,137 @@ local function icon(on)
   return img:template(true)
 end
 
+-- ===========================================================================
+-- Video desktop — loop a scenic clip behind the desktop icons. Same "folder is
+-- the config" idea as sound sets: drop .mp4/.mov/.m4v into wallpaperDirs[1], OR
+-- symlink Apple's downloaded Aerials in via _syncAerials() — the picker scans
+-- for both. Rendered in one hs.webview per screen, pinned below the desktop-icon
+-- layer, muted and looped. WKWebView only reads siblings of the HTML that loads
+-- it, so the wrapper is written INTO the folder and video.src is a RELATIVE
+-- basename — which is also why a symlink to a root-owned /Library aerial plays.
+-- Codec note: WebKit decodes H.264/HEVC (Apple's SDR aerials are HEVC); ProRes/
+-- Sorenson give error.code 4 — transcode with ffmpeg -c:v libx264 first.
+-- ===========================================================================
+local WP_EXTS     = { mp4 = true, mov = true, m4v = true }
+local AERIAL_ROOT = "/Library/Application Support/com.apple.idleassetsd/Customer"
+
+-- Quote a basename as a JS double-quoted string (hs.json.encode rejects bare
+-- strings); assigning it to video.src lets the browser resolve spaces/Unicode.
+local function jsString(s) return '"' .. s:gsub('[\\"]', '\\%0') .. '"' end
+
+function obj:_wpDir() return expand(self.wallpaperDirs[1]) end
+
+-- Sorted basenames of every video clip in the folder (own drops AND aerial
+-- symlinks alike). Called lazily on menu open, so a new drop needs no reload.
+function obj:_wallpapers()
+  local names, dir = {}, self:_wpDir()
+  if hs.fs.attributes(dir) then
+    for f in hs.fs.dir(dir) do
+      local ext = f:match("%.(%w+)$")
+      if ext and WP_EXTS[ext:lower()] then names[#names + 1] = f end
+    end
+  end
+  table.sort(names, function(a, b) return a:lower() < b:lower() end)
+  return names
+end
+
+-- Symlink whatever Apple Aerials are downloaded (any category — Landscape,
+-- Cityscape, Underwater, Earth) into the folder; a symlink into the folder plays
+-- even though the target is root-owned /Library. Friendly names come from
+-- entries.json (id → accessibilityLabel). SDR only (skip HDR washout). Prunes
+-- symlinks whose target has vanished. Returns the count linked.
+function obj:_syncAerials()
+  local dir = self:_wpDir(); hs.fs.mkdir(dir)
+  local names = {}
+  local fh = io.open(AERIAL_ROOT .. "/entries.json", "r")
+  if fh then
+    local ok, data = pcall(hs.json.decode, fh:read("a")); fh:close()
+    if ok and type(data) == "table" and data.assets then
+      for _, a in ipairs(data.assets) do
+        if a.id then names[a.id:lower()] = a.accessibilityLabel or a.id end
+      end
+    end
+  end
+  local linked = 0
+  if hs.fs.attributes(AERIAL_ROOT) then
+    for sub in hs.fs.dir(AERIAL_ROOT) do
+      local subdir = AERIAL_ROOT .. "/" .. sub
+      if sub:find("SDR") and hs.fs.attributes(subdir, "mode") == "directory" then
+        for f in hs.fs.dir(subdir) do
+          local uuid = f:match("^(.+)%.mov$")
+          if uuid then
+            local nm   = (names[uuid:lower()] or uuid):gsub("[/:]", "-")
+            local link = dir .. "/Aerial - " .. nm .. ".mov"
+            os.remove(link)
+            if hs.fs.link(subdir .. "/" .. f, link, true) then linked = linked + 1 end
+          end
+        end
+      end
+    end
+  end
+  for f in hs.fs.dir(dir) do                                   -- prune dangling symlinks
+    local p  = dir .. "/" .. f
+    local la = hs.fs.symlinkAttributes(p)
+    if la and la.mode == "link" and not hs.fs.attributes(p) then os.remove(p) end
+  end
+  return linked
+end
+
+function obj:_writeWallpaperHTML(name)
+  local html = table.concat({
+    '<!doctype html><html><head><meta charset="utf-8"><style>',
+    'html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}',
+    'video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}',
+    '</style></head><body><video autoplay loop muted playsinline></video><script>',
+    'var v=document.querySelector("video");',
+    'v.src=' .. jsString(name) .. '; v.muted=true;',
+    'function go(){var p=v.play(); if(p&&p.catch)p.catch(function(){});}',
+    'v.addEventListener("canplay",go); go();',
+    'document.addEventListener("visibilitychange",function(){if(!document.hidden)go();});',
+    '</script></body></html>',
+  }, "\n")
+  local fh = io.open(self:_wpDir() .. "/.klonk-wallpaper.html", "w")
+  if fh then fh:write(html); fh:close() end
+end
+
+function obj:_tearDownWallpaper()
+  for _, w in ipairs(self._wpViews) do w:delete() end
+  self._wpViews = {}
+end
+
+function obj:_makeWallpaperView(screen)
+  local w = hs.webview.new(screen:fullFrame(), { developerExtrasEnabled = false })
+  w:windowStyle(hs.webview.windowMasks.borderless)
+  w:level(hs.canvas.windowLevels.desktopIcon - 1)              -- behind icons, above wallpaper
+  w:behaviorAsLabels({ "canJoinAllSpaces", "stationary" })
+  w:allowTextEntry(false)
+  return w
+end
+
+function obj:_applyWallpaper()
+  self:_tearDownWallpaper()
+  local name = self._wp
+  if not name then return end
+  local dir = self:_wpDir()
+  if not hs.fs.attributes(dir .. "/" .. name) then            -- clip vanished
+    self._wp = nil; hs.settings.clear("klonk.wallpaper"); return
+  end
+  if self._wpPauseBattery and hs.battery.powerSource() == "Battery Power" then return end
+  self:_writeWallpaperHTML(name)
+  local htmlURL = "file://" .. dir .. "/.klonk-wallpaper.html"
+  for _, scr in ipairs(hs.screen.allScreens()) do
+    local w = self:_makeWallpaperView(scr)
+    w:url(htmlURL); w:show()
+    self._wpViews[#self._wpViews + 1] = w
+  end
+end
+
+function obj:_setWallpaper(name)
+  self._wp = name
+  if name then hs.settings.set("klonk.wallpaper", name) else hs.settings.clear("klonk.wallpaper") end
+  self:_applyWallpaper()
+end
+
 function obj:_refresh()
   if self._menu then self._menu:setIcon(icon(self._on)) end
   if self._tap then
@@ -266,20 +416,18 @@ function obj:_refresh()
 end
 
 function obj:_menuItems()
-  local items = {
-    { title = hs.styledtext.new("klonk", { font = { name = "Menlo-Bold", size = 11 },
-        color = { white = 0.5 } }), disabled = true },
-    { title = "-" },
-    -- Action-verb labels: the row says what CLICKING does, not what the state
-    -- is (the state is already visible — the icon dims and slashes when muted).
+  -- ---- Keyboard sounds ----------------------------------------------------
+  -- Action-verb labels: the row says what CLICKING does, not what the state is
+  -- (the state is already visible — the icon dims and slashes when muted).
+  local kb = {
     { title = self._on and "Turn sounds off" or "Turn sounds on",
       fn = function() self._on = not self._on; self:_refresh() end },
     { title = self._mouse and "Turn mouse clicks off" or "Turn mouse clicks on",
       fn = function() self._mouse = not self._mouse; self:_refresh() end },
     { title = "-" },
   }
-  -- Sets grouped by family, one submenu each (the Ambient pattern). The
-  -- checkmark on a family row points at where the active set lives.
+  -- Sets grouped by family, one submenu each. The checkmark on a family row
+  -- points at where the active set lives.
   local groups = {}
   for _, s in ipairs(self:_sets()) do
     local c = self:_category(s)
@@ -295,7 +443,7 @@ function obj:_menuItems()
         rows[#rows + 1] = { title = s, checked = (s == self._set),
           fn = function() self:_load(s); self:_refresh() end }
       end
-      items[#items + 1] = { title = cat.label, menu = rows, checked = active }
+      kb[#kb + 1] = { title = cat.label, menu = rows, checked = active }
     end
   end
   local vol = {}
@@ -312,43 +460,79 @@ function obj:_menuItems()
         self:_refresh()
       end }
   end
-  items[#items + 1] = { title = "-" }
-  items[#items + 1] = { title = "Volume", menu = vol }
-
-  -- Ambient beds: a looping background soundscape under the typing.
-  local beds = self:_beds()
-  if #beds > 0 then
-    local bmenu = { { title = "None", checked = (self._bed == nil),
-      fn = function() self:_playBed(nil); self:_refresh() end }, { title = "-" } }
-    for _, b in ipairs(beds) do
-      bmenu[#bmenu + 1] = { title = b, checked = (b == self._bed),
-        fn = function() self:_playBed(b); self:_refresh() end }
-    end
-    bmenu[#bmenu + 1] = { title = "-" }
-    local bvol = {}
-    for _, v in ipairs(VOLUMES) do
-      bvol[#bvol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
-        checked = (math.abs(v - self._bedVol) < 0.01),
-        fn = function()
-          self._bedVol = v
-          if self._bedSound then self._bedSound:volume(v) end
-          self:_refresh()
-        end }
-    end
-    bmenu[#bmenu + 1] = { title = "Bed volume", menu = bvol }
-    items[#items + 1] = { title = "Ambient", menu = bmenu }
-  end
-
-  items[#items + 1] = { title = "Add sound sets…", fn = function()
-    local d = expand("~/.klonk/sounds")
-    hs.fs.mkdir(d)
-    hs.execute(("open '%s'"):format(d))
+  kb[#kb + 1] = { title = "-" }
+  kb[#kb + 1] = { title = "Volume", menu = vol }
+  kb[#kb + 1] = { title = "-" }
+  kb[#kb + 1] = { title = "Add sound sets…", fn = function()
+    local d = expand("~/Music/Klonk/Sounds"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
   end }
-  items[#items + 1] = { title = "a set = folder of WAVs: down1..N, up1..N,",
-    disabled = true, indent = 1 }
-  items[#items + 1] = { title = "space, enter, backspace; optional click, scroll",
-    disabled = true, indent = 1 }
-  return items
+  kb[#kb + 1] = { title = "a set = folder of WAVs: down1..N, up1..N,", disabled = true, indent = 1 }
+  kb[#kb + 1] = { title = "space, enter, backspace; optional click, scroll", disabled = true, indent = 1 }
+
+  -- ---- Ambient sounds -----------------------------------------------------
+  -- A looping background soundscape (rain, surf, hum) under the typing.
+  local amb = { { title = "None", checked = (self._bed == nil),
+    fn = function() self:_playBed(nil); self:_refresh() end }, { title = "-" } }
+  for _, b in ipairs(self:_beds()) do
+    amb[#amb + 1] = { title = b, checked = (b == self._bed),
+      fn = function() self:_playBed(b); self:_refresh() end }
+  end
+  amb[#amb + 1] = { title = "-" }
+  local bvol = {}
+  for _, v in ipairs(VOLUMES) do
+    bvol[#bvol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
+      checked = (math.abs(v - self._bedVol) < 0.01),
+      fn = function()
+        self._bedVol = v
+        if self._bedSound then self._bedSound:volume(v) end
+        self:_refresh()
+      end }
+  end
+  amb[#amb + 1] = { title = "Bed volume", menu = bvol }
+  amb[#amb + 1] = { title = "-" }
+  amb[#amb + 1] = { title = "Add ambient beds…", fn = function()
+    local d = expand("~/Music/Klonk/Ambience"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+  end }
+
+  -- ---- Video desktop ------------------------------------------------------
+  -- Loop a scenic clip behind the icons: your own drops, or Apple Aerials.
+  local vid = { { title = "Off", checked = (self._wp == nil),
+    fn = function() self:_setWallpaper(nil) end }, { title = "-" } }
+  local clips = self:_wallpapers()
+  if #clips == 0 then
+    vid[#vid + 1] = { title = "No clips yet — add .mp4/.mov, or sync aerials below", disabled = true }
+  else
+    for _, name in ipairs(clips) do
+      vid[#vid + 1] = { title = name:gsub("%.%w+$", ""), checked = (self._wp == name),
+        fn = function() self:_setWallpaper(name) end }
+    end
+  end
+  vid[#vid + 1] = { title = "-" }
+  vid[#vid + 1] = { title = "Pause on battery", checked = self._wpPauseBattery,
+    fn = function()
+      self._wpPauseBattery = not self._wpPauseBattery
+      hs.settings.set("klonk.wppausebattery", self._wpPauseBattery)
+      self:_applyWallpaper()
+    end }
+  vid[#vid + 1] = { title = "Sync Apple aerials now", fn = function()
+    local n = self:_syncAerials()
+    hs.alert.show(n > 0
+      and ("Linked " .. n .. " Apple aerial" .. (n == 1 and "" or "s") .. " — reopen this menu")
+      or  "No aerials downloaded — add them in System Settings ▸ Wallpaper, then sync")
+  end }
+  vid[#vid + 1] = { title = "Add your own clips…", fn = function()
+    local d = self:_wpDir(); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+  end }
+
+  -- ---- Top level: three groups, active state shown by a group checkmark ----
+  return {
+    { title = hs.styledtext.new("klonk", { font = { name = "Menlo-Bold", size = 11 },
+        color = { white = 0.5 } }), disabled = true },
+    { title = "-" },
+    { title = "Keyboard sounds", menu = kb,  checked = self._on },
+    { title = "Ambient sounds",  menu = amb, checked = (self._bed ~= nil) },
+    { title = "Video desktop",   menu = vid, checked = (self._wp ~= nil) },
+  }
 end
 
 --- Klonk:toggle()
@@ -383,8 +567,13 @@ end
 --- Method
 --- Called automatically by `hs.loadSpoon`. Resolves the default sound dirs.
 function obj:init()
-  self.soundDirs = self.soundDirs or { hs.spoons.resourcePath("sounds"), "~/.klonk/sounds" }
-  self.ambientDirs = self.ambientDirs or { hs.spoons.resourcePath("ambient"), "~/.klonk/ambient" }
+  self.soundDirs = self.soundDirs or {
+    hs.spoons.resourcePath("sounds"), "~/Music/Klonk/Sounds", "~/.klonk/sounds"
+  }
+  self.ambientDirs = self.ambientDirs or {
+    hs.spoons.resourcePath("ambient"), "~/Music/Klonk/Ambience", "~/.klonk/ambient"
+  }
+  self.wallpaperDirs = self.wallpaperDirs or { "~/Movies/Klonk/Wallpapers" }
   return self
 end
 
@@ -396,7 +585,9 @@ function obj:start()
   self._on = hs.settings.get("klonk.on"); if self._on == nil then self._on = true end
   self._mouse = hs.settings.get("klonk.mouse"); if self._mouse == nil then self._mouse = true end
   self._vol = hs.settings.get("klonk.vol") or 0.7
-  self._set = hs.settings.get("klonk.set") or (self:_sets()[1] or "thock")
+  local savedSet = hs.settings.get("klonk.set")
+  local selected = SET_ALIASES[savedSet] or savedSet
+  self._set = selected and self:_setDir(selected) and selected or (self:_sets()[1] or "thock")
   self._bedVol = hs.settings.get("klonk.bedvol") or 0.5
 
   local et = hs.eventtap.event.types
@@ -455,6 +646,18 @@ function obj:start()
   self._menu:setMenu(function() return self:_menuItems() end)
   self:_load(self._set)
   self:_playBed(hs.settings.get("klonk.bed"))   -- resume last ambient bed, if any
+
+  -- Video desktop: restore last pick, keep Apple aerials linked, and re-render
+  -- on screen-layout / battery changes so the clip tracks the live geometry.
+  self._wpPauseBattery = hs.settings.get("klonk.wppausebattery") or false
+  self._wp = hs.settings.get("klonk.wallpaper")
+  self:_syncAerials()
+  self._wpScreen = self._wpScreen or hs.screen.watcher.new(function() self:_applyWallpaper() end):start()
+  self._wpBattery = self._wpBattery or hs.battery.watcher.new(function()
+    if self._wpPauseBattery then self:_applyWallpaper() end
+  end):start()
+  self:_applyWallpaper()
+
   self:_refresh()
   return self
 end
@@ -465,6 +668,9 @@ end
 function obj:stop()
   if self._tap then self._tap:stop(); self._tap = nil end
   if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
+  self:_tearDownWallpaper()
+  if self._wpScreen then self._wpScreen:stop(); self._wpScreen = nil end
+  if self._wpBattery then self._wpBattery:stop(); self._wpBattery = nil end
   if self._menu then self._menu:delete(); self._menu = nil end
   return self
 end

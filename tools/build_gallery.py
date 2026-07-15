@@ -36,9 +36,9 @@ for name in sorted(os.listdir(SOUNDS)):
 
 # rough per-family labels for the chips
 FAMILY = {
-    "thock": "synth · deep", "clicky": "synth · bright", "typewriter": "synth · Selectric",
-    "telegraph": "synth · sounder", "manual": "synth · type-bar", "trek": "synth · LCARS",
-    "water": "synth · drips", "vibraphone": "musical · pentatonic", "kalimba": "musical · pentatonic",
+    "thock": "synth · deep", "crystal": "synth · glass tings", "typewriter": "synth · Selectric",
+    "telegraph": "recorded · sounder", "console": "synth · 8-bit", "trek": "synth · LCARS",
+    "vibraphone": "musical · pentatonic", "kalimba": "musical · pentatonic",
     "harpsichord": "musical · pentatonic", "jazzy": "musical · pentatonic",
 }
 
@@ -82,7 +82,7 @@ html = """<!doctype html>
     <h1><span class="kbd">⌨</span>klonk</h1>
     <p class="sub">Mechanical keystroke sounds. Pick a set, click the box, and type.</p>
     <div class="chips" id="chips"></div>
-    <textarea id="pad" placeholder="type here — every key makes a sound, Return dings…" autofocus></textarea>
+    <textarea id="pad" placeholder="type here — every key makes a sound…" autofocus></textarea>
     <div class="row">
       <label>volume</label>
       <input type="range" id="vol" min="0" max="1" step="0.05" value="0.7">

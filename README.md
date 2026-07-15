@@ -1,11 +1,17 @@
 # ⌨ klonk
 
-**Mechanical keystroke sounds for macOS — in any voice you like.**
+**Desktop ambiance for macOS — mechanical keystroke sounds, ambient beds, and a looping video desktop.**
 
-klonk plays a sound as you type, anywhere in macOS, from a Hammerspoon menu-bar
-item. A *sound set* is just a folder of WAVs, so the eleven built-in synthesized
-sets, real recorded keyboards, and anything you drop in all play the same way.
-Every set rings a Return "ding" baked into its own `enter.wav`.
+klonk is a Hammerspoon menu-bar item with one icon and three groups, each built
+on the same idea — *the folder is the config*:
+
+- **Keyboard sounds** — a sound as you type, in any voice you like.
+- **Ambient sounds** — a loopable background bed (rain, surf, a bridge hum) under the typing.
+- **Video desktop** — a scenic clip looping behind your desktop icons (your own, or Apple's Aerials).
+
+klonk plays a sound as you type, anywhere in macOS. A *sound set* is just a folder
+of WAVs, so the built-in synthesized and recorded sets—and anything you drop in—play
+the same way. Each set gives Return its own flourish through `enter.wav`.
 
 **Mouse clicks and scrolling ring too.** A click is mechanically just a
 down-then-up, so every set voices the mouse for free from its `down`/`up` pool —
@@ -18,6 +24,24 @@ mouse its own voice.
 
 ▶️ **[Try it in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
 pick a set and type; it runs the same logic client-side, no install.
+
+---
+
+## Video desktop
+
+The **Video desktop** submenu loops a scenic clip behind your desktop icons — the
+desktop-window trick every live-wallpaper app uses, rendered in an `hs.webview`
+pinned just below the icon layer, muted and looped, on every screen. Two ways to
+fill it, both scanning the same `~/Movies/Klonk/Wallpapers` folder:
+
+- **Drop your own clips** — any `.mp4`/`.mov`/`.m4v` (WebKit decodes H.264/HEVC;
+  transcode ProRes/other with `ffmpeg -c:v libx264` first). They appear as picks.
+- **Apple Aerials, zero-copy** — *Sync Apple aerials now* symlinks whatever
+  screensaver Aerials you've downloaded (System Settings ▸ Wallpaper) straight in
+  by their real names. Symlinks, not copies, so they cost nothing and stay current.
+
+*Pause on battery* stops playback on battery power. The pick is remembered and
+restored at login.
 
 ---
 
@@ -55,18 +79,19 @@ keystrokes); klonk only *listens* — it never intercepts or alters your typing.
 
 ## The built-in sets
 
-All eleven are synthesized from scratch (no samples) by `tools/generate.py`:
+Nine sets are synthesized from scratch by `tools/generate.py`; Telegraph is
+curated from recorded sounder actions:
 
 | Family | Sets | Character |
 |---|---|---|
-| Percussive | `thock` `clicky` `typewriter` | noise-burst contact + resonant body |
-| Mechanical | `telegraph` `manual` | impact + pitch-sagging thump + saturation — reads as *physical* |
-| Tonal | `trek` `water` | pitched glides — LCARS blips, water drips |
+| Percussive | `thock` `crystal` `typewriter` | deep contact, glass/crystal tings, and Selectric character |
+| Mechanical | `telegraph` `console` | recorded sounder actions and chunky old-school console beeps/bops |
+| Tonal | `trek` | pitched glides — LCARS-style blips |
 | Musical | `vibraphone` `kalimba` `harpsichord` `jazzy` | notes from a **minor-pentatonic** scale, so random keypresses improvise a melody |
 
 ## Add your own sets
 
-Drop a folder of WAVs into `~/.klonk/sounds/<name>/` (the menu's **Add sound
+Drop a folder of WAVs into `~/Music/Klonk/Sounds/<name>/` (the menu's **Add sound
 sets…** opens it). The naming convention:
 
 ```
@@ -89,7 +114,7 @@ console blips? `tools/make_set.py` slices, trims, normalizes, and maps them onto
 the whole convention (keys **and** mouse voices) in one shot:
 
 ```sh
-python3 tools/make_set.py ~/sounds/paper paper              # -> ~/.klonk/sounds/paper
+python3 tools/make_set.py ~/sounds/paper calligraph    # -> ~/Music/Klonk/Sounds/calligraph
 python3 tools/make_set.py ~/trek lcars --enter "Working.m4a" --space "Door Chime.aif"
 ```
 
@@ -100,12 +125,81 @@ the random keystroke pool, so a door chime doesn't fire on every letter). Short
 samples become keys and clicks; the fullest becomes space/enter. Needs `ffmpeg`.
 Output lands in your personal dir, never the repo.
 
+## Build a set from ONE recording
+
+Don't have pre-cut samples? Capture one continuous recording and let
+`tools/slice_recording.py` find the hits: it runs transient detection over the
+whole file, prints a manifest of every detected hit (time, duration, peak,
+attack), slices them into one-shots, and hands them to `make_set.py`:
+
+```sh
+python3 tools/slice_recording.py recording.m4a myset --dry-run   # look first
+python3 tools/slice_recording.py recording.m4a myset --bell      # then build
+```
+
+The natural capture tool on macOS is [Piezo](https://rogueamoeba.com/piezo/)
+(or any app-audio recorder): set its **source to the app making the sound** —
+QuickTime's audio recording only captures microphones, i.e. your speakers
+re-recorded through the room. Tap objects near a real mic, or play a video, a
+game, a synth page in the browser; ~10–30 distinct hits with a beat of quiet
+between them make the best material. Tune `--thresh` (onset sensitivity) and
+`--gap-ms` (quiet time separating two hits) against the `--dry-run` manifest
+until the hit count matches what you heard; `--keep-slices DIR` saves the raw
+one-shots for hand-curation. Needs `ffmpeg`.
+
+## The studio — see and organize your sound world
+
+`tools/studio.py` serves a local page that makes the whole setup visible: a
+keyboard where every key shows which sound it plays, a mouse cluster, and a
+library of all your sets and ambient beds:
+
+```sh
+python3 tools/studio.py          # then open http://127.0.0.1:8801
+```
+
+- **Click any key** (or just type in the test bar) to audition it; the detail
+  panel shows the exact files behind that role — length, attack, ring time,
+  and how many voices the engine will bank for it.
+- **Dashed keys are fallbacks**: a set with no `click1.wav` shows the mouse
+  borrowing the `down` pool, so the engine's fallback chains are visible
+  instead of implicit.
+- **Every set gets a chunky ↔ flowy meter**, measured from the audio itself:
+  ring time (how long the tail stays audible) plus attack sharpness. Real
+  recorded keyboards read chunky; the pentatonic musical sets read flowy.
+- **Live apply**: with the Hammerspoon CLI installed (`hs.ipc.cliInstall()`
+  once in the HS console), "apply to Mac" switches the running engine to the
+  set or bed you're previewing — the studio header shows what's live.
+
+The studio is a *view* over the same folders the Spoon plays — it keeps no
+state of its own, needs no dependencies (Python stdlib only), and binds to
+localhost.
+
+### Environments — remix sounds across sets
+
+The studio can also **edit**: click any key, drag its volume, or hit
+"swap sound…" to assign that role a sound from *any* set in your inventory —
+crystal's Return ding on a browns keyboard, console's scroll ticks, the
+telegraph clack for right-click. Everything previews live in the page (nothing
+is written while you experiment), and saving compiles the remix into a plain
+set folder in `~/Music/Klonk/Sounds/<name>/`:
+
+- **Per-sound volume is baked, not configured** — a gain of 60% rewrites the
+  WAV's samples at compile time, so the engine plays a quieter file with zero
+  new code paths.
+- The recipe is saved alongside as `environment.json`, so an environment stays
+  editable (reopen it in the studio, tweak, re-save) and self-describing.
+- An environment can carry its **ambient bed** and a pinned `voices` count;
+  "save + apply" switches the whole mood — keys and bed together.
+- To the engine an environment is just another set (it appears in the menu
+  under **Environments**); deleting one from the studio never touches the
+  source sets it borrowed from.
+
 ## Ambient beds
 
 klonk can also play a **looping background soundscape** under your typing — pick
 one from the menu-bar **Ambient** submenu (with its own bed volume). Three CC0
 beds ship synthesized: `rain`, `wind`, `surf`. Drop your own long, loopable audio
-into `~/.klonk/ambient/<name>.wav` (waves, a thunderstorm, a starship bridge hum)
+into `~/Music/Klonk/Ambience/<name>.m4a` (waves, a thunderstorm, a starship bridge hum)
 and it joins the list. Beds are independent of the keystroke switch and resume
 across restarts.
 
@@ -113,8 +207,8 @@ across restarts.
 
 `tools/import_pack.py` pulls real recorded switch packs from
 [Mechvibes](https://github.com/hainguyents13/mechvibes) (MIT) and slices them
-into klonk sets in `~/.klonk/sounds/` — it also downloads a CC0 typewriter bell
-and bakes it into each set's Return:
+into Klonk sets in `~/Music/Klonk/Sounds/` — it also downloads a CC0 typewriter bell
+and can optionally bake it into a set's Return:
 
 ```sh
 python3 tools/import_pack.py cherrymx-blue-pbt  blues
@@ -148,10 +242,12 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
 - **Zero idle cost.** A set is preloaded into `hs.sound` objects when selected,
   so a keystroke is a table lookup + play with no disk I/O. The `eventtap` is
   observe-only (`return false`) — it hears keys, never swallows them.
-- **The ding is per-set.** Each set's Return sound lives in its own `enter.wav`,
-  so a telegraph rings an office bell, a manual rings a carriage bell, and the
-  musical sets run a glissando — no universal overlay.
-- **Mechanical vs. digital.** The `telegraph`/`manual` sets use a broadband
+- **Return is per-set.** Each set's Return sound lives in its own `enter.wav`:
+  Console uses a drum-pad action without a ding, Telegraph uses a recorded
+  physical action, and musical sets can run a glissando — no universal overlay.
+- **Mechanical vs. digital.** The recorded `telegraph` and synthesized `console`
+  sets use distinct source material while sharing a tactile workstation role.
+  Console's generator uses a broadband
   impact + a low body tone that *sags in pitch* as it decays + soft saturation —
   the three things clean sine partials can't fake.
 - **Voices layer, adaptively.** A single `hs.sound` is monophonic — retriggering
@@ -159,7 +255,7 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
   round-robins through, letting fast keystrokes ring out and overlap into a wash.
   The bank size is sized to each sound's own length (≈one voice per 0.1s, capped
   at `Klonk.voices`, default 6): a short recorded-keyboard clack resolves to a
-  single crisp voice, while a long sample (paper, splash, kalimba, the LCARS
+  single crisp voice, while a long sample (calligraph, splash, kalimba, the LCARS
   console) fans out and layers. Drop a `voices` file (one integer) in a set folder
   to pin it — `import_pack.py` writes `1` so real keyboards stay crisp.
 - **Mouse for free.** The same `eventtap` also taps left/right mouse and scroll.

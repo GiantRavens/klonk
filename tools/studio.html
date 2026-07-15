@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>klonk studio</title>
+<style>
+  :root { color-scheme: dark;
+    --bg:#0d0f12; --panel:#13161b; --edge:#232830; --edge2:#333a45;
+    --ink:#e7e9ec; --dim:#9aa0a8; --faint:#6b7280;
+    --accent:#7ab7ff; --gold:#e8b45a; --ok:#6fce8f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 -apple-system, system-ui, sans-serif;
+         background:var(--bg); color:var(--ink); padding-bottom:64px; }
+  header { display:flex; align-items:center; gap:16px; padding:14px 22px;
+           border-bottom:1px solid var(--edge); position:sticky; top:0;
+           background:var(--bg); z-index:5; }
+  h1 { font:700 22px/1 ui-monospace, Menlo, monospace; letter-spacing:-.5px; margin:0; }
+  .kbd { display:inline-block; border:2px solid var(--ink); border-radius:4px;
+         padding:0 6px; margin-right:8px; }
+  #engine { font-size:12px; color:var(--dim); display:flex; align-items:center; gap:7px;
+            border:1px solid var(--edge); border-radius:16px; padding:5px 12px; }
+  #engine .dot { width:8px; height:8px; border-radius:50%; background:var(--faint); }
+  #engine.live .dot { background:var(--ok); }
+  header .spacer { flex:1; }
+  header label { font-size:12px; color:var(--faint); }
+  input[type=range] { accent-color:var(--ink); }
+
+  main { display:grid; grid-template-columns: 1fr 340px; gap:0; }
+  #stage { padding:26px 30px; min-width:0; }
+  #side  { border-left:1px solid var(--edge); padding:18px;
+           height:calc(100vh - 61px); overflow-y:auto; position:sticky; top:61px; }
+
+  /* ------- current set header ------- */
+  #setname { font:700 30px/1.1 ui-monospace, Menlo, monospace; margin:0 0 2px; }
+  #setmeta { color:var(--dim); font-size:13px; margin-bottom:8px;
+             display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .badge { border:1px solid var(--edge2); border-radius:11px; padding:1px 9px;
+           font-size:11px; color:var(--dim); }
+  .srcbadge { border:1px solid var(--gold); color:var(--gold); border-radius:11px;
+              padding:1px 9px; font-size:11px; }
+  .meter { display:inline-flex; align-items:center; gap:8px; }
+  .meter .bar { width:110px; height:6px; border-radius:3px; position:relative;
+    background:linear-gradient(90deg, var(--gold), #8a8f98 50%, var(--accent)); opacity:.85; }
+  .meter .pin { position:absolute; top:-3px; width:4px; height:12px; border-radius:2px;
+                background:var(--ink); box-shadow:0 0 0 2px var(--bg); }
+  .meter .lbl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  #applyset { margin-left:auto; }
+  button { background:var(--panel); color:var(--ink); border:1px solid var(--edge2);
+           border-radius:8px; padding:6px 14px; font:600 12px/1 -apple-system, system-ui, sans-serif;
+           cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--faint); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  button.gold { color:var(--gold); border-color:var(--gold); background:none; }
+  button.danger { color:#e07a7a; border-color:#5a3333; background:none; }
+
+  /* ------- keyboard ------- */
+  #kb { margin:22px auto 0; max-width:860px; user-select:none; }
+  .krow { display:flex; gap:6px; margin-bottom:6px; }
+  .key { flex:1 0 0; height:46px; border:1px solid var(--edge2); border-radius:7px;
+         background:var(--panel); display:flex; align-items:center; justify-content:center;
+         font:500 12px/1 ui-monospace, Menlo, monospace; color:var(--dim);
+         cursor:pointer; transition:all .07s; position:relative; }
+  .key:hover { border-color:var(--faint); color:var(--ink); }
+  .key.hit { background:var(--ink); color:var(--bg); transform:translateY(1px); }
+  .key.role  { border-color:#3d5a80; color:var(--accent); }
+  .key.ghost { border-style:dashed; color:var(--faint); }
+  .key.mod   { border-color:var(--gold); color:var(--gold); border-style:solid; }
+  .key.selected { outline:2px solid var(--accent); outline-offset:1px; }
+  .key .sub { position:absolute; bottom:3px; right:6px; font-size:8.5px; color:var(--faint); }
+  .key.mod .sub { color:var(--gold); }
+  .w15{flex-grow:1.5} .w18{flex-grow:1.8} .w22{flex-grow:2.2} .w25{flex-grow:2.5} .w62{flex-grow:6.2}
+
+  #mouserow { display:flex; gap:10px; justify-content:center; margin-top:16px; }
+  #mouserow .key { flex:0 0 118px; height:40px; font-size:11px; }
+
+  #typebar { margin:20px auto 0; max-width:860px; }
+  #typebar input { width:100%; background:var(--panel); color:var(--ink);
+    border:1px solid var(--edge); border-radius:10px; padding:12px 16px;
+    font:15px/1 ui-monospace, Menlo, monospace; outline:none; }
+  #typebar input:focus { border-color:var(--faint); }
+
+  /* ------- detail panel ------- */
+  #detail { margin:26px auto 0; max-width:860px; border:1px solid var(--edge);
+            border-radius:12px; background:var(--panel); padding:16px 20px; display:none; }
+  #detail h3 { margin:0 0 4px; font:700 15px ui-monospace, Menlo, monospace;
+               display:flex; align-items:center; gap:10px; }
+  #detail .chain { color:var(--faint); font-size:12px; margin-bottom:10px; }
+  .gainrow { display:flex; align-items:center; gap:12px; margin:8px 0 14px;
+             font-size:12px; color:var(--dim); }
+  .gainrow input[type=range] { width:220px; }
+  .gainrow .gv { font-family:ui-monospace, Menlo, monospace; color:var(--ink); width:44px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:left; color:var(--faint); font-weight:500; padding:4px 10px 6px 0;
+       border-bottom:1px solid var(--edge); }
+  td { padding:6px 10px 6px 0; border-bottom:1px solid var(--edge); color:var(--dim); }
+  td:first-child { color:var(--ink); font-family:ui-monospace, Menlo, monospace; }
+  .playbtn { border:1px solid var(--edge2); border-radius:6px; background:none;
+             color:var(--accent); padding:2px 10px; font-size:11px; }
+  .voicespips { letter-spacing:2px; color:var(--accent); }
+
+  /* ------- sidebar ------- */
+  #side h2 { font:700 11px/1 -apple-system, system-ui, sans-serif; color:var(--faint);
+             text-transform:uppercase; letter-spacing:.1em; margin:18px 0 8px; }
+  #side h2:first-child { margin-top:2px; }
+  .setrow { display:flex; align-items:center; gap:10px; padding:7px 10px;
+            border-radius:9px; cursor:pointer; border:1px solid transparent; }
+  .setrow:hover { background:var(--panel); }
+  .setrow.on { background:var(--panel); border-color:var(--edge2); }
+  .setrow .nm { font:600 13px ui-monospace, Menlo, monospace; flex:1;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .setrow .nm small { color:var(--faint); font-weight:400; margin-left:6px; }
+  .minimeter { width:44px; height:4px; border-radius:2px; position:relative; flex:none;
+    background:linear-gradient(90deg, var(--gold), #8a8f98 50%, var(--accent)); opacity:.8; }
+  .minimeter .pin { position:absolute; top:-2px; width:3px; height:8px; border-radius:1.5px;
+                    background:var(--ink); }
+  .bedrow { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:9px; }
+  .bedrow:hover { background:var(--panel); }
+  .bedrow .nm { flex:1; font-size:12.5px; color:var(--dim);
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bedrow.playing .nm { color:var(--ink); }
+  .bedrow .dur { font-size:10.5px; color:var(--faint); }
+  .icon { border:1px solid var(--edge2); border-radius:6px; background:none; width:26px;
+          height:22px; color:var(--dim); font-size:10px; padding:0; }
+  .icon.active { color:var(--ok); border-color:var(--ok); }
+
+  /* ------- inventory drawer ------- */
+  #drawer { position:fixed; top:0; right:0; bottom:0; width:410px; background:#101318;
+            border-left:1px solid var(--edge2); z-index:10; display:none;
+            flex-direction:column; box-shadow:-24px 0 60px rgba(0,0,0,.55); }
+  #drawer.show { display:flex; }
+  .dhead { display:flex; align-items:center; gap:10px; padding:14px 16px;
+           border-bottom:1px solid var(--edge); font-size:13px; }
+  .dhead b { font-family:ui-monospace, Menlo, monospace; color:var(--gold); }
+  .dhead .x { margin-left:auto; }
+  #drawersearch { margin:10px 16px 4px; background:var(--bg); color:var(--ink);
+    border:1px solid var(--edge2); border-radius:8px; padding:8px 12px;
+    font:13px ui-monospace, Menlo, monospace; outline:none; }
+  #drawerlist { overflow-y:auto; flex:1; padding:4px 10px 20px; }
+  .invhead { font:700 10.5px -apple-system, system-ui, sans-serif; color:var(--faint);
+             text-transform:uppercase; letter-spacing:.08em; padding:14px 8px 4px; }
+  .invrow { display:flex; gap:8px; align-items:center; padding:4px 8px;
+            border-radius:8px; font-size:12px; }
+  .invrow:hover { background:var(--panel); }
+  .invrow.assigned { outline:1px solid var(--gold); }
+  .invrow .fn { font-family:ui-monospace, Menlo, monospace; color:var(--ink); flex:1;
+                min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .invrow .st { color:var(--faint); font-size:10.5px; flex:none; }
+  .invrow button { padding:3px 9px; font-size:10.5px; flex:none; }
+
+  /* ------- draft bar ------- */
+  #draftbar { position:fixed; bottom:0; left:0; right:0; background:#15181e;
+              border-top:1px solid var(--edge2); padding:10px 22px; display:none;
+              align-items:center; gap:12px; z-index:8; font-size:13px; flex-wrap:wrap; }
+  #draftbar.show { display:flex; }
+  #draftbar .changes { color:var(--gold); font-weight:600; }
+  #draftbar label { color:var(--faint); font-size:12px; }
+  #draftbar input[type=text] { background:var(--bg); border:1px solid var(--edge2);
+    border-radius:7px; color:var(--ink); padding:6px 10px; width:170px;
+    font:13px ui-monospace, Menlo, monospace; outline:none; }
+  #draftbar select { background:var(--bg); color:var(--ink); border:1px solid var(--edge2);
+    border-radius:7px; padding:5px 8px; font-size:12px; }
+  #draftbar .spacer { flex:1; }
+
+  #toast { position:fixed; bottom:74px; left:50%; transform:translateX(-50%);
+           background:var(--ink); color:var(--bg); border-radius:9px; padding:8px 18px;
+           font-size:13px; font-weight:600; opacity:0; transition:opacity .25s; z-index:12; }
+  #toast.show { opacity:1; }
+  footer { color:var(--faint); font-size:11px; padding:18px 30px; }
+</style></head>
+<body>
+<header>
+  <h1><span class="kbd">⌨</span>klonk studio</h1>
+  <div id="engine"><span class="dot"></span><span id="enginetxt">connecting…</span></div>
+  <div class="spacer"></div>
+  <label>preview volume <input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></label>
+</header>
+
+<main>
+  <section id="stage">
+    <h2 id="setname">…</h2>
+    <div id="setmeta"></div>
+    <div id="kb"></div>
+    <div id="mouserow"></div>
+    <div id="typebar">
+      <input id="pad" placeholder="type here to hear this set — keys light up as you go" autocomplete="off">
+    </div>
+    <div id="detail"></div>
+    <footer>a set is a folder of WAVs — this page is a view over the same files the Spoon plays.
+      dashed keys borrow another pool (the engine's fallback chain); gold keys carry a remix override.
+      click a key, then "swap sound…" to assign any sound from any set.</footer>
+  </section>
+
+  <aside id="side">
+    <div id="setlist"></div>
+    <h2>ambient beds</h2>
+    <div id="bedlist"></div>
+  </aside>
+</main>
+
+<div id="drawer">
+  <div class="dhead">assign a sound to <b id="drawerrole">?</b>
+    <button class="x" onclick="closeDrawer()">close</button></div>
+  <input id="drawersearch" placeholder="filter: set, file, role, character…">
+  <div id="drawerlist"></div>
+</div>
+
+<div id="draftbar">
+  <span class="changes" id="draftinfo"></span>
+  <label>name <input type="text" id="draftname" placeholder="e.g. writing"></label>
+  <label>bed <select id="draftbed"></select></label>
+  <label>voices <select id="draftvoices"></select></label>
+  <div class="spacer"></div>
+  <button onclick="saveDraft(false)">save</button>
+  <button class="primary" onclick="saveDraft(true)">save + apply</button>
+  <button onclick="discardDraft()">discard</button>
+</div>
+<div id="toast"></div>
+
+<script>
+let STATE = null, current = null, vol = 0.7, bedAudio = null, bedPlaying = null;
+let draft = null, editingRole = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => encodeURIComponent(s);
+const setByName = n => STATE.sets.find(s => s.name === n);
+
+// ---- audio: cache per URL, clone to overlap (the browser's version of banks)
+const cache = {};
+function play(url, level) {
+  if (!url) return;
+  let a = cache[url];
+  if (!a) { a = new Audio(url); cache[url] = a; }
+  const c = a.cloneNode();
+  c.volume = Math.max(0, Math.min(1, (level ?? 1) * vol));
+  c.play().catch(()=>{});
+}
+function playFile(setName, file, gain) {
+  play(`/audio/set/${esc(setName)}/${esc(file)}`, gain ?? 1);
+}
+function rand(arr) { return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : null; }
+
+// ---- remix draft: overrides live in memory and play from their SOURCE sets,
+// so test/preview/assign costs nothing until save compiles a real folder.
+function draftActive() { return draft && current && draft.view === current.name; }
+function draftOv(role) { return draftActive() ? draft.roles[role] : null; }
+
+function ensureDraft() {
+  if (draft) return draft;
+  if (current.environment && !current.environment.error) {
+    draft = JSON.parse(JSON.stringify(current.environment));   // edit the recipe
+    draft.roles = draft.roles || {};
+  } else {
+    draft = { name: "", base: current.name, roles: {}, bed: bedPlaying,
+              voices: current.voicesOverride };
+  }
+  draft.view = current.name;
+  renderDraftbar();
+  return draft;
+}
+function discardDraft() {
+  draft = null;
+  renderDraftbar(); paintKeyboard();
+  if (editingRole) showDetail(editingRole);
+}
+
+// resolve a role to {files, via, ov} — draft override wins, then the set's own
+// files, then the engine's fallback chain
+function resolve(set, role) {
+  const ov = draftOv(role);
+  if (ov) {
+    const src = setByName(ov.set);
+    if (src) {
+      const files = ov.pool ? (src.roles[ov.pool] || [])
+        : (src.roles[(ov.file||"").replace(/\.\w+$/,"").replace(/\d+$/,"")] || [])
+            .filter(f => f.file === ov.file);
+      if (files.length) return { files, via: null, ov };
+    }
+  }
+  if (set.roles[role]) return { files: set.roles[role], via: null, ov: null };
+  const chain = STATE.fallbackChains[role] || [];
+  for (const t of chain) if (set.roles[t]) return { files: set.roles[t], via: t, ov: null };
+  return { files: null, via: null, ov: null };
+}
+function playRole(set, role) {
+  const r = resolve(set, role);
+  const f = rand(r.files);
+  if (f) playFile(r.ov ? r.ov.set : set.name, f.file, r.ov ? (r.ov.gain ?? 1) : 1);
+  return r;
+}
+
+// ---- keyboard geometry: [label, css-width-class, physical e.code list, role]
+const ROWS = [
+  [["`",0,["Backquote"]],["1",0,["Digit1"]],["2",0,["Digit2"]],["3",0,["Digit3"]],["4",0,["Digit4"]],["5",0,["Digit5"]],["6",0,["Digit6"]],["7",0,["Digit7"]],["8",0,["Digit8"]],["9",0,["Digit9"]],["0",0,["Digit0"]],["-",0,["Minus"]],["=",0,["Equal"]],["delete","w18",["Backspace"],"backspace"]],
+  [["tab","w18",["Tab"]],["Q",0,["KeyQ"]],["W",0,["KeyW"]],["E",0,["KeyE"]],["R",0,["KeyR"]],["T",0,["KeyT"]],["Y",0,["KeyY"]],["U",0,["KeyU"]],["I",0,["KeyI"]],["O",0,["KeyO"]],["P",0,["KeyP"]],["[",0,["BracketLeft"]],["]",0,["BracketRight"]],["\\",0,["Backslash"]]],
+  [["caps","w22",["CapsLock"]],["A",0,["KeyA"]],["S",0,["KeyS"]],["D",0,["KeyD"]],["F",0,["KeyF"]],["G",0,["KeyG"]],["H",0,["KeyH"]],["J",0,["KeyJ"]],["K",0,["KeyK"]],["L",0,["KeyL"]],[";",0,["Semicolon"]],["'",0,["Quote"]],["return","w22",["Enter"],"enter"]],
+  [["shift","w25",["ShiftLeft"]],["Z",0,["KeyZ"]],["X",0,["KeyX"]],["C",0,["KeyC"]],["V",0,["KeyV"]],["B",0,["KeyB"]],["N",0,["KeyN"]],["M",0,["KeyM"]],[",",0,["Comma"]],[".",0,["Period"]],["/",0,["Slash"]],["shift","w25",["ShiftRight"]]],
+  [["ctrl","w15",["ControlLeft"]],["opt","w15",["AltLeft"]],["cmd","w18",["MetaLeft"]],["space","w62",["Space"],"space"],["cmd","w18",["MetaRight"]],["opt","w15",["AltRight"]]],
+];
+const MOUSE = [["left click","click"],["right click","rightclick"],["click release","clickup"],["scroll tick","scroll"]];
+const codeToKey = {};
+
+function buildKeyboard() {
+  const kb = $("#kb"); kb.innerHTML = "";
+  for (const row of ROWS) {
+    const div = document.createElement("div"); div.className = "krow";
+    for (const [label, w, codes, role] of row) {
+      const k = document.createElement("div");
+      k.className = "key" + (w ? " " + w : "");
+      k.textContent = label;
+      k.dataset.role = role || "down";
+      k.onclick = () => { playRole(current, k.dataset.role); showDetail(k.dataset.role); markSelected(k); };
+      for (const c of codes) codeToKey[c] = k;
+      div.appendChild(k);
+    }
+    kb.appendChild(div);
+  }
+  const mr = $("#mouserow"); mr.innerHTML = "";
+  for (const [label, role] of MOUSE) {
+    const k = document.createElement("div");
+    k.className = "key"; k.dataset.role = role;
+    k.innerHTML = label;
+    k.onclick = () => { playRole(current, role); showDetail(role); markSelected(k); };
+    mr.appendChild(k);
+  }
+}
+function markSelected(el) {
+  document.querySelectorAll(".key.selected").forEach(k => k.classList.remove("selected"));
+  el.classList.add("selected");
+}
+
+// restyle keys for the current set: dedicated roles accent, fallbacks ghost,
+// draft overrides gold with the source set named
+function paintKeyboard() {
+  document.querySelectorAll("#kb .key, #mouserow .key").forEach(k => {
+    const role = k.dataset.role;
+    k.classList.remove("role", "ghost", "mod");
+    k.querySelector(".sub")?.remove();
+    const ov = draftOv(role);
+    const sub = txt => { const s = document.createElement("span");
+      s.className = "sub"; s.textContent = txt; k.appendChild(s); };
+    if (ov) { k.classList.add("mod"); sub("✎ " + ov.set); return; }
+    if (role === "down") return;
+    if (current.roles[role]) { k.classList.add("role"); return; }
+    const r = resolve(current, role);
+    k.classList.add("ghost");
+    sub(r.via ? "→ " + r.via : "silent");
+  });
+}
+
+function meterHTML(flow, label, mini) {
+  if (flow == null) return "";
+  const pin = p => `<span class="pin" style="left:calc(${(p*100).toFixed(0)}% - 2px)"></span>`;
+  return mini ? `<span class="minimeter" title="${label} (${flow})">${pin(flow)}</span>`
+    : `<span class="meter"><span class="lbl">chunky</span><span class="bar">${pin(flow)}</span>` +
+      `<span class="lbl">flowy</span><span class="badge">${label}</span></span>`;
+}
+
+function showSet(set) {
+  current = set;
+  editingRole = null;
+  $("#setname").textContent = set.name;
+  const nfiles = Object.values(set.roles).reduce((a, v) => a + v.length, 0);
+  const voices = set.voicesOverride ? `voices pinned to ${set.voicesOverride}` :
+    `adaptive voices (cap ${STATE.voiceCap})`;
+  const isEnv = set.environment && !set.environment.error;
+  $("#setmeta").innerHTML =
+    (isEnv ? `<span class="srcbadge">environment · remix of ${set.environment.base}</span>` : "") +
+    `<span class="badge">${set.category}</span>` +
+    `<span class="badge">${set.source}</span>` +
+    `<span class="badge">${nfiles} files</span>` +
+    `<span class="badge">${voices}</span>` +
+    meterHTML(set.character.flow, set.character.label) +
+    (isEnv ? `<button id="editenv" class="gold">edit remix</button>` +
+             `<button id="delenv" class="danger">delete</button>` : "") +
+    `<button id="applyset" class="primary">apply to Mac</button>`;
+  $("#applyset").disabled = !(STATE.hs && STATE.hs.cli);
+  $("#applyset").onclick = () => apply(isEnv && set.environment.bed
+    ? { set: set.name, bed: set.environment.bed } : { set: set.name });
+  if (isEnv) {
+    $("#editenv").onclick = () => { ensureDraft(); paintKeyboard(); };
+    $("#delenv").onclick = async () => {
+      if (!confirm(`Delete environment "${set.name}"? The compiled folder is removed; ` +
+                   `its source sets are untouched.`)) return;
+      const r = await fetch(`/api/environment/${esc(set.name)}`, { method: "DELETE" });
+      toast(r.ok ? "deleted" : "delete failed");
+      await refresh(false);
+      showSet(STATE.sets[0]);
+    };
+  }
+  paintKeyboard();
+  $("#detail").style.display = "none";
+  document.querySelectorAll(".setrow").forEach(r =>
+    r.classList.toggle("on", r.dataset.name === set.name));
+  playRole(set, "down");
+}
+
+// ---- detail panel: audition, per-role gain, swap from inventory
+function gainBase(role) {
+  // what a gain-only tweak applies to: the draft's base set must own the role
+  const b = setByName(draft ? draft.base : current.name);
+  return b && b.roles[role] ? b : null;
+}
+
+function showDetail(role) {
+  editingRole = role;
+  const d = $("#detail");
+  const r = resolve(current, role);
+  const ov = r.ov;
+  const isGeneric = !["space","enter","backspace"].includes(role);
+
+  let head = role;
+  let chainTxt;
+  if (ov) {
+    chainTxt = `remixed — playing ${ov.pool ? `the <b>${ov.pool}</b> pool` : `<b>${ov.file}</b>`}` +
+               ` from <b>${ov.set}</b> (unsaved until you save the environment)`;
+  } else if (current.roles[role]) {
+    chainTxt = `dedicated ${role} sounds in this set`;
+  } else if (r.via) {
+    chainTxt = `no ${role} files — borrowing the <b>${r.via}</b> pool (engine fallback: ` +
+               `${role} → ${(STATE.fallbackChains[role]||[]).join(" → ")})`;
+  } else {
+    chainTxt = `no ${role} files and no fallback pool — this role is silent`;
+  }
+
+  const gain = ov ? (ov.gain ?? 1) : 1;
+  const canGain = ov || gainBase(role) || current.roles[role];
+  let rows = "";
+  for (const f of (r.files || [])) {
+    const pips = "●".repeat(f.bank) + "○".repeat(Math.max(0, STATE.voiceCap - f.bank));
+    const srcSet = ov ? ov.set : current.name;
+    rows += `<tr><td>${f.file}</td>` +
+      `<td>${f.dur != null ? f.dur.toFixed(2) + "s" : "?"}</td>` +
+      `<td>${f.analyzed ? (f.attack*100).toFixed(0) + "%" : "–"}</td>` +
+      `<td>${f.analyzed ? f.ring.toFixed(2) + "s" : "–"}</td>` +
+      `<td class="voicespips" title="voice bank size">${pips}</td>` +
+      `<td><button class="playbtn" data-set="${srcSet}" data-file="${f.file}" data-gain="${gain}">play</button></td></tr>`;
+  }
+
+  d.innerHTML = `<h3>${head}` +
+      (ov ? `<span class="srcbadge">✎ from ${ov.set}</span>` +
+            `<button class="playbtn" id="revert">revert</button>` : "") +
+      `<button class="playbtn" id="swap" style="margin-left:auto">swap sound…</button></h3>` +
+    `<div class="chain">${chainTxt}</div>` +
+    `<div class="gainrow">volume ` +
+      `<input type="range" id="gainslider" min="0.05" max="1.5" step="0.05" value="${gain}" ${canGain ? "" : "disabled"}>` +
+      `<span class="gv" id="gainval">${Math.round(gain*100)}%</span>` +
+      `<button class="playbtn" id="gaintest">test</button>` +
+      (canGain ? "" : `<span style="color:var(--faint)">assign a sound first — this role only borrows a pool</span>`) +
+    `</div>` +
+    (rows ? `<table><tr><th>file</th><th>length</th><th>attack</th><th>ring</th><th>voices</th><th></th></tr>${rows}</table>` : "");
+  d.style.display = "block";
+
+  d.querySelectorAll(".playbtn[data-file]").forEach(b =>
+    b.onclick = () => playFile(b.dataset.set, b.dataset.file, parseFloat(b.dataset.gain)));
+  $("#swap").onclick = () => openDrawer(role);
+  $("#gaintest").onclick = () => playRole(current, role);
+  if (ov) $("#revert").onclick = () => {
+    ensureDraft(); delete draft.roles[role];
+    renderDraftbar(); paintKeyboard(); showDetail(role);
+  };
+  const slider = $("#gainslider");
+  slider.oninput = () => {
+    const g = parseFloat(slider.value);
+    $("#gainval").textContent = Math.round(g*100) + "%";
+    setRoleGain(role, g, isGeneric);
+  };
+  slider.onchange = () => playRole(current, role);
+}
+
+function setRoleGain(role, g, isGeneric) {
+  ensureDraft();
+  let entry = draft.roles[role];
+  if (!entry) {
+    const b = gainBase(role);
+    if (!b) return;
+    entry = isGeneric ? { set: b.name, pool: role }
+                      : { set: b.name, file: b.roles[role][0].file };
+    draft.roles[role] = entry;
+  }
+  entry.gain = g;
+  renderDraftbar(); paintKeyboard();
+}
+
+// ---- inventory drawer: every sound in every set, assignable to the open role
+function openDrawer(role) {
+  editingRole = role;
+  $("#drawerrole").textContent = role;
+  $("#drawer").classList.add("show");
+  $("#drawersearch").value = "";
+  renderDrawer("");
+  $("#drawersearch").focus();
+}
+function closeDrawer() { $("#drawer").classList.remove("show"); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+
+function renderDrawer(q) {
+  const role = editingRole;
+  const isGeneric = !["space","enter","backspace"].includes(role);
+  const ov = draftOv(role);
+  const list = $("#drawerlist"); list.innerHTML = "";
+  q = q.toLowerCase();
+  for (const s of STATE.sets) {
+    const rowsHere = [];
+    for (const [stem, files] of Object.entries(s.roles)) {
+      for (const f of files) {
+        const hay = `${s.name} ${f.file} ${stem} ${s.category} ${s.character.label||""}`.toLowerCase();
+        if (q && !hay.includes(q)) continue;
+        rowsHere.push({ stem, f });
+      }
+    }
+    if (!rowsHere.length) continue;
+    const h = document.createElement("div");
+    h.className = "invhead";
+    h.textContent = `${s.name} · ${s.character.label || s.category}`;
+    list.appendChild(h);
+    for (const { stem, f } of rowsHere) {
+      const row = document.createElement("div");
+      row.className = "invrow";
+      if (ov && ov.set === s.name && (ov.file === f.file || ov.pool === stem))
+        row.classList.add("assigned");
+      const poolN = (s.roles[stem] || []).length;
+      row.innerHTML =
+        `<button class="playbtn pv">▶</button>` +
+        `<span class="fn">${f.file}</span>` +
+        `<span class="st">${f.dur != null ? f.dur.toFixed(2) + "s" : ""}</span>` +
+        (isGeneric && poolN > 1
+          ? `<button class="use pool">use ${stem} pool (${poolN})</button>` : "") +
+        `<button class="use one primary">use</button>`;
+      row.querySelector(".pv").onclick = () => playFile(s.name, f.file);
+      row.querySelector(".one").onclick = () => assign(role, { set: s.name, file: f.file });
+      const pb = row.querySelector(".pool");
+      if (pb) pb.onclick = () => assign(role, { set: s.name, pool: stem });
+      list.appendChild(row);
+    }
+  }
+  if (!list.children.length)
+    list.innerHTML = `<div class="invhead">nothing matches "${q}"</div>`;
+}
+document.addEventListener("input", e => {
+  if (e.target.id === "drawersearch") renderDrawer(e.target.value);
+});
+
+function assign(role, ref) {
+  ensureDraft();
+  const prev = draft.roles[role];
+  draft.roles[role] = { ...ref, gain: prev ? (prev.gain ?? 1) : 1 };
+  renderDraftbar(); paintKeyboard(); showDetail(role);
+  renderDrawer($("#drawersearch").value);   // re-highlight the assigned row
+  playRole(current, role);                  // instant preview of the assignment
+}
+
+// ---- draft bar: name it, pick a bed, save = compile a real set folder
+function renderDraftbar() {
+  const bar = $("#draftbar");
+  if (!draft) { bar.classList.remove("show"); return; }
+  bar.classList.add("show");
+  const n = Object.keys(draft.roles).length;
+  $("#draftinfo").textContent = `✎ remix of ${draft.base} — ${n} change${n === 1 ? "" : "s"}`;
+  if (document.activeElement !== $("#draftname")) $("#draftname").value = draft.name || "";
+  const bedSel = $("#draftbed");
+  bedSel.innerHTML = `<option value="">none</option>` +
+    STATE.beds.map(b => `<option${b.name === draft.bed ? " selected" : ""}>${b.name}</option>`).join("");
+  bedSel.onchange = () => draft.bed = bedSel.value || null;
+  const vSel = $("#draftvoices");
+  vSel.innerHTML = `<option value="">auto</option>` +
+    [1,2,3,4,5,6].map(v => `<option${v === draft.voices ? " selected" : ""}>${v}</option>`).join("");
+  vSel.onchange = () => draft.voices = vSel.value ? parseInt(vSel.value) : null;
+  $("#draftname").oninput = () => draft.name = $("#draftname").value;
+}
+
+async function saveDraft(applyAfter) {
+  const name = ($("#draftname").value || "").trim();
+  if (!name) { toast("give the environment a name first"); $("#draftname").focus(); return; }
+  draft.name = name;
+  const body = { name, base: draft.base, roles: draft.roles,
+                 bed: draft.bed || null, voices: draft.voices || null };
+  try {
+    const r = await fetch("/api/environment", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) { toast("save failed: " + (j.error || r.status)); return; }
+    toast(`saved "${name}"` + (j.warnings.length ? ` (${j.warnings.length} warnings)` : ""));
+    if (j.warnings.length) console.warn("klonk studio:", j.warnings);
+    draft = null;
+    closeDrawer();
+    await refresh(false);
+    const saved = setByName(name);
+    if (saved) showSet(saved);
+    renderDraftbar();
+    if (applyAfter) apply(body.bed ? { set: name, bed: body.bed } : { set: name });
+  } catch (e) { toast("save failed: " + e); }
+}
+
+// ---- sidebar
+function buildSide() {
+  const catLabels = { environment:"environments", samples:"keyboard samples",
+                      mechanical:"mechanical", themed:"themed", musical:"musical", other:"more sets" };
+  const box = $("#setlist"); box.innerHTML = "";
+  for (const cat of STATE.categories) {
+    const sets = STATE.sets.filter(s => s.category === cat);
+    if (!sets.length) continue;
+    const h = document.createElement("h2"); h.textContent = catLabels[cat] || cat;
+    box.appendChild(h);
+    for (const s of sets) {
+      const row = document.createElement("div");
+      row.className = "setrow"; row.dataset.name = s.name;
+      row.innerHTML = `<span class="nm">${s.name}` +
+        (s.source !== "bundled" && cat !== "environment" ? `<small>${s.source}</small>` : "") + `</span>` +
+        meterHTML(s.character.flow, s.character.label, true);
+      row.onclick = () => showSet(s);
+      box.appendChild(row);
+    }
+  }
+  const beds = $("#bedlist"); beds.innerHTML = "";
+  for (const b of STATE.beds) {
+    const row = document.createElement("div");
+    row.className = "bedrow"; row.dataset.name = b.name;
+    const mins = b.dur ? Math.round(b.dur / 60) + "m" : "";
+    row.innerHTML =
+      `<button class="icon prev" title="preview">▶</button>` +
+      `<span class="nm">${b.name}</span><span class="dur">${mins}</span>` +
+      `<button class="icon applybed" title="play on Mac">⌘</button>`;
+    row.querySelector(".prev").onclick = () => toggleBed(b, row);
+    const ab = row.querySelector(".applybed");
+    ab.disabled = !(STATE.hs && STATE.hs.cli);
+    ab.onclick = () => apply({ bed: b.name });
+    beds.appendChild(row);
+  }
+  if (STATE.beds.length) {
+    const stop = document.createElement("div");
+    stop.className = "bedrow";
+    stop.innerHTML = `<button class="icon">■</button><span class="nm">none (stop bed on Mac)</span>`;
+    stop.querySelector("button").onclick = () => apply({ bed: null });
+    if (!(STATE.hs && STATE.hs.cli)) stop.querySelector("button").disabled = true;
+    beds.appendChild(stop);
+  }
+}
+
+function toggleBed(b, row) {
+  if (bedAudio) { bedAudio.pause(); bedAudio = null; }
+  document.querySelectorAll(".bedrow").forEach(r => {
+    r.classList.remove("playing");
+    const p = r.querySelector(".prev"); if (p) { p.textContent = "▶"; p.classList.remove("active"); }
+  });
+  if (bedPlaying === b.name) { bedPlaying = null; return; }
+  bedPlaying = b.name;
+  bedAudio = new Audio(`/audio/bed/${esc(b.name)}`);
+  bedAudio.loop = true; bedAudio.volume = 0.5 * vol;
+  bedAudio.play().catch(()=>{});
+  row.classList.add("playing");
+  const p = row.querySelector(".prev"); p.textContent = "❚❚"; p.classList.add("active");
+}
+
+// ---- engine link
+function paintEngine() {
+  const el = $("#engine"), txt = $("#enginetxt");
+  const hs = STATE.hs || {};
+  if (hs.engine) {
+    el.classList.add("live");
+    txt.textContent = `live — ${hs.engine.set || "?"}` +
+      (hs.engine.bed ? ` + ${hs.engine.bed}` : "") + (hs.engine.on ? "" : " (muted)");
+  } else if (hs.cli) {
+    el.classList.remove("live");
+    txt.textContent = "hs found, engine unreachable — is Klonk loaded?";
+  } else {
+    el.classList.remove("live");
+    txt.textContent = "preview only — install hs.ipc for live apply";
+    el.title = hs.error || "";
+  }
+}
+
+async function apply(payload) {
+  try {
+    const r = await fetch("/api/apply", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const j = await r.json();
+    toast(r.ok ? "applied ✓" : "apply failed: " + JSON.stringify(j));
+    refresh(false);
+  } catch (e) { toast("apply failed: " + e); }
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+// ---- typing: physical keys drive the same role resolution as the engine
+function flash(code) {
+  const k = codeToKey[code];
+  if (k) { k.classList.add("hit"); setTimeout(() => k.classList.remove("hit"), 90); }
+}
+$("#pad").addEventListener("keydown", e => {
+  if (!current || e.metaKey) return;
+  flash(e.code);
+  if (e.code === "Space") playRole(current, "space");
+  else if (e.code === "Enter") playRole(current, "enter");
+  else if (e.code === "Backspace") playRole(current, "backspace");
+  else if (e.key.length === 1 || e.code === "Tab") playRole(current, "down");
+  if (e.code === "Tab") e.preventDefault();
+});
+$("#pad").addEventListener("keyup", e => {
+  if (!current) return;
+  if (e.key.length === 1 || e.code === "Space") playRole(current, "up");
+});
+$("#vol").addEventListener("input", e => {
+  vol = parseFloat(e.target.value);
+  if (bedAudio) bedAudio.volume = 0.5 * vol;
+});
+
+async function refresh(first) {
+  const r = await fetch("/api/state");
+  STATE = await r.json();
+  paintEngine();
+  buildSide();
+  if (first) {
+    buildKeyboard();
+    const live = STATE.hs && STATE.hs.engine && STATE.hs.engine.set;
+    const pick = STATE.sets.find(s => s.name === live) || STATE.sets[0];
+    if (pick) showSet(pick);
+  } else if (current) {
+    current = setByName(current.name) || current;
+    paintKeyboard();
+    document.querySelectorAll(".setrow").forEach(r =>
+      r.classList.toggle("on", r.dataset.name === current.name));
+  }
+}
+refresh(true);
+</script>
+</body></html>
