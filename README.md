@@ -1,35 +1,12 @@
 # ⌨ klonk
 
-**Desktop ambiance for macOS — mechanical keystroke sounds, ambient beds, and a looping video desktop.**
+**Desktop ambiance for macOS — mechanical keystroke sounds, ambient soundscapes, even a live video ON YOUR DESKTOP.**
 
-klonk is a Hammerspoon menu-bar item with one icon and three groups, each built
-on the same idea — *the folder is the config*:
+klonk is a Hammerspoon menu-bar item with one icon and three groups, each covering different aspects of how you want to curate your Mac's working environment. Want cool keyboard sounds? Weird keyboard sounds? How about an ambient soundtrack of the beach, city life, or favorite sci-fi while you work. And how about we paint a moving desktop on your screen that simply taps into the existing Apple screensaver videos.
 
-- **Keyboard sounds** — a sound as you type, in any voice you like.
-- **Ambient sounds** — a loopable background bed (rain, surf, a bridge hum) under the typing.
-- **Video desktop** — a scenic clip looping behind your desktop icons (your own, or Apple's Aerials).
+Best of all, as a Hammerspoon macOS utility its easily configurable - drop in your own keyboard sounds, videos, ambient soundloops any time.
 
-Together they're one control surface for **curating your entire workspace
-experience** — what you hear as you type, the soundscape underneath it, and what
-moves behind your icons — from a single menu-bar icon, all remembered across
-restarts. Every pillar follows the same rule, *the folder is the config*: add a
-WAV set, a loopable bed, or a video clip and it just shows up in the menu. Nothing
-to configure, no accounts, no daemon — set the mood and get back to work.
-
-klonk plays a sound as you type, anywhere in macOS. A *sound set* is just a folder
-of WAVs, so the built-in synthesized and recorded sets—and anything you drop in—play
-the same way. Each set gives Return its own flourish through `enter.wav`.
-
-**Mouse clicks and scrolling ring too.** A click is mechanically just a
-down-then-up, so every set voices the mouse for free from its `down`/`up` pool —
-no new files needed. Trackpad scroll and the wheel tick as you scroll (throttled,
-and silent during inertial coasting). A **Mouse clicks** menu toggle turns it
-on/off independently of the keyboard. macOS reports a trackpad tap and a physical
-mouse click identically, so both are covered by the same click sound; a set can
-ship dedicated `click` / `clickup` / `rightclick` / `scroll` WAVs to give the
-mouse its own voice.
-
-▶️ **[Try it in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
+[Try the keyboard sounds in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
 pick a set and type; it runs the same logic client-side, no install. The test page
 includes Cherry MX Blue, Cherry MX Brown, and Holy Panda recordings so you can
 compare real switches before importing a pack.
