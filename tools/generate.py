@@ -348,8 +348,8 @@ def render_mech(base, only=None):
                 write_wav(os.path.join(d, name), s)
         print(f"  {set_name}: {len(os.listdir(d))} files (mechanical)")
 
-# --- AMBIENT beds: looping background soundscapes -----------------------------
-# A bed is a long, quiet, LOOPABLE noise texture that plays under the typing.
+# --- AMBIENT SOUNDS: looping background soundscapes --------------------------
+# An ambient sound is a long, quiet, loopable texture that plays under typing.
 # The whole illusion is shaped filtered noise + slow modulation:
 #   rain  = bright hiss (band-passed noise) + random droplet transients
 #   wind  = dark noise whose level + cutoff swell on a slow, irregular gust LFO
@@ -410,14 +410,14 @@ def render_ambient(base):
     os.makedirs(d, exist_ok=True)
     for name, fn in AMBIENT.items():
         write_wav(os.path.join(d, f"{name}.wav"), fn())
-    print(f"  ambient: {len(AMBIENT)} beds (rain, wind, surf) -> {d}")
+    print(f"  ambient: {len(AMBIENT)} sounds (rain, wind, surf) -> {d}")
 
 
 def main():
     flags = sys.argv[1:]
     args = [a for a in flags if not a.startswith("-")]
     only = MOUSE_KEYS if "--mouse" in flags else None          # additive: only touch mouse files
-    ambient_only = "--ambient" in flags                        # additive: only rebuild beds
+    ambient_only = "--ambient" in flags                  # additive: only rebuild ambient sounds
     base = os.path.abspath(args[0]) if args \
         else os.path.dirname(os.path.abspath(__file__))
     os.makedirs(base, exist_ok=True)

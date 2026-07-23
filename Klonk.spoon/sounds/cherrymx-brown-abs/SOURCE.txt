@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: cherrymx-brown-abs
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/cherrymx-brown-abs
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: 1a77001c5741aff8102c967ba7b8f42d40771506f185174ff40d0de78a265385
+Source config SHA-256: 1d7e52bdcf47ba01b97293c8a97564c520bcc5a92167424ca78b20f065243509
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

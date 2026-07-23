@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: topre-purple-hybrid-pbt
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/topre-purple-hybrid-pbt
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: af073650844bced0050df018bf872b16307a1143c8f356be5ea75340e6dc0298
+Source config SHA-256: e3fc883989968b2e4fe5922cc25583b96ee564469b90340933cf53f59059b58e
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

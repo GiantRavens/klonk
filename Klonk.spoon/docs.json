@@ -5,7 +5,7 @@
       {
         "name": "soundDirs",
         "def": "Klonk.soundDirs",
-        "doc": "List of directories scanned for sound sets. Set before :start() to customize. Defaults to bundled sounds/, ~/Music/Klonk/Sounds, and the legacy ~/.klonk/sounds fallback. Earlier directories win.",
+        "doc": "List of directories scanned for sound sets. Set before :start() to customize. Defaults to bundled sounds/, ~/Music/Klonk/keyboard, and legacy fallbacks. Earlier directories win.",
         "type": "Variable"
       }
     ],

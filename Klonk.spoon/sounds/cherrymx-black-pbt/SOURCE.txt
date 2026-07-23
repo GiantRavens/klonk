@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: cherrymx-black-pbt
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/cherrymx-black-pbt
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: 29f3ce7f6b700db7076831ceb2ef8b616652538195690707763563b4a8805b37
+Source config SHA-256: 5821ebb9187015b7b288c4a567e31d913e58917462fb95424fae12d14dd603f8
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

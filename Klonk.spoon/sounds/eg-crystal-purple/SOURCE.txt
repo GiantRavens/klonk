@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: eg-crystal-purple
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/eg-crystal-purple
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: 8f5da33383bcbc610fb510e04571c65d07ef6bd214d82fbc39738ee1810b5d84
+Source config SHA-256: 685d036e039c4fa5c68d79fbbcc8982a2917ac8f89b4a509c7ab790ecc9b4da8
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

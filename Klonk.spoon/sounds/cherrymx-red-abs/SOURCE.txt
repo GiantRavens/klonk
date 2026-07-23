@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: cherrymx-red-abs
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/cherrymx-red-abs
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: 330f91fc14f5a5232594f17058f02603ea67226fafd362fcf94e90463dbdcb40
+Source config SHA-256: e901930bc2e804b928fffb41a0bf84af40c8959bf6e53559eb04e25a02e82ccd
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

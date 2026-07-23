@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: eg-oreo
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/eg-oreo
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: 6e40d3e8acaf32b0b19b777fb628c0f563a7d29dc4b6b652c1dadff31c828a98
+Source config SHA-256: f6f5dccf1c69aadba1fdb901b2df8bc85457f08a3307ad05b8e84e58b6f45463
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

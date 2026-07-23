@@ -3,7 +3,7 @@
 
 Serves tools/studio.html on localhost and exposes a small JSON API over the same
 filesystem contract the Spoon reads: sets are folders of WAVs in soundDirs,
-beds are loopable files in ambientDirs, earlier directories win. The studio is
+ambient sounds are loopable files in ambientDirs, earlier directories win. The studio is
 a VIEW plus (later) a compiler over that contract — it holds no private state.
 
 Observe-before-act: every set gets an analysis manifest (per-file duration,
@@ -28,17 +28,19 @@ def expand(p): return os.path.expanduser(p)
 # Same scan lists and precedence as Klonk.spoon/init.lua — earlier dirs win.
 SOUND_DIRS = [
     (os.path.join(ROOT, "Klonk.spoon", "sounds"), "bundled"),
-    (expand("~/Music/Klonk/Sounds"), "user"),
+    (expand("~/Music/Klonk/keyboard"), "user"),
+    (expand("~/Music/Klonk/Sounds"), "legacy"),
     (expand("~/.klonk/sounds"), "legacy"),
 ]
 AMBIENT_DIRS = [
     (os.path.join(ROOT, "Klonk.spoon", "ambient"), "bundled"),
-    (expand("~/Music/Klonk/Ambience"), "user"),
+    (expand("~/Music/Klonk/ambient"), "user"),
+    (expand("~/Music/Klonk/Ambience"), "legacy"),
     (expand("~/.klonk/ambient"), "legacy"),
 ]
 
 AUDIO_RE_EXT = (".wav", ".aif", ".aiff", ".mp3")          # what the engine loads
-BED_EXT = (".wav", ".mp3", ".aif", ".aiff", ".m4a")
+AMBIENT_EXT = (".wav", ".mp3", ".aif", ".aiff", ".m4a")
 GENERIC = {"down", "up", "click", "clickup", "rightclick", "scroll"}
 DEDICATED = {"space", "enter", "backspace"}
 CATEGORIES = ["environment", "samples", "mechanical", "themed", "musical", "other"]
@@ -216,14 +218,14 @@ def describe_set(name, setdir, source):
     }
 
 
-def scan_beds():
+def scan_ambient():
     out = {}
     for dirpath, source in AMBIENT_DIRS:
         if not os.path.isdir(dirpath):
             continue
         for f in sorted(os.listdir(dirpath)):
             name, ext = os.path.splitext(f)
-            if f.startswith((".", "_")) or ext.lower() not in BED_EXT or name in out:
+            if f.startswith((".", "_")) or ext.lower() not in AMBIENT_EXT or name in out:
                 continue
             path = os.path.join(dirpath, f)
             dur = analyze_wav(path)["dur"] if ext.lower() == ".wav" else probe_duration(path)
@@ -297,7 +299,7 @@ def compile_environment(m):
     if name == base:
         raise ValueError("an environment cannot be based on itself")
 
-    user_dir = expand("~/Music/Klonk/Sounds")
+    user_dir = expand("~/Music/Klonk/keyboard")
     out_dir = os.path.join(user_dir, name)
     if name in sets:
         existing, src = sets[name]
@@ -393,11 +395,11 @@ def compile_environment(m):
         elif os.path.exists(vpath):
             os.remove(vpath)
 
-    bed = m.get("bed")
-    if bed and bed not in scan_beds():
-        warnings.append("bed %r not found — saved anyway" % bed)
+    ambient = m.get("ambient")
+    if ambient and ambient not in scan_ambient():
+        warnings.append("ambient sound %r not found — saved anyway" % ambient)
     manifest = {"name": name, "base": base, "roles": clean_roles,
-                "bed": bed, "voices": int(voices) if voices else None}
+                "ambient": ambient, "voices": int(voices) if voices else None}
     with open(os.path.join(out_dir, "environment.json"), "w") as f:
         json.dump(manifest, f, indent=2)
 
@@ -440,8 +442,8 @@ def hs_eval(lua):
 def engine_state():
     ok, out = hs_eval(
         'local K = spoon and spoon.Klonk; if not K then return "null" end; '
-        'return hs.json.encode({set=K._set, bed=K._bed, on=K._on, '
-        'mouse=K._mouse, vol=K._vol, bedvol=K._bedVol})')
+        'return hs.json.encode({set=K._set, ambient=K._ambient, on=K._on, '
+        'mouse=K._mouse, vol=K._vol, ambientvol=K._ambientVol})')
     if not ok:
         return None, out
     try:
@@ -495,10 +497,10 @@ class Handler(BaseHTTPRequestHandler):
             sets = scan_sets()
             if name in sets and safe_name(fname) and "/" not in fname:
                 return self._send_file(os.path.join(sets[name][0], fname))
-        if len(parts) == 3 and parts[:2] == ["audio", "bed"]:
-            bed = scan_beds().get(parts[2])
-            if bed:
-                return self._send_file(bed["_path"])
+        if len(parts) == 3 and parts[:2] == ["audio", "ambient"]:
+            ambient = scan_ambient().get(parts[2])
+            if ambient:
+                return self._send_file(ambient["_path"])
         if parts == ["favicon.ico"]:
             return self._send(204, b"", "image/x-icon")
         self._send(404, {"error": "not found"})
@@ -529,16 +531,16 @@ class Handler(BaseHTTPRequestHandler):
                 "hs.alert.show('klonk: ' .. %s, 0.7); return 'ok'"
                 % (lua_str(name), lua_str(name)))
             results["set"] = {"ok": ok, "detail": out}
-        if "bed" in req:
-            bed = req["bed"]
-            if bed is not None and (not safe_name(bed) or bed not in scan_beds()):
-                return self._send(400, {"error": "unknown bed"})
-            arg = lua_str(bed) if bed else "nil"
+        if "ambient" in req:
+            ambient = req["ambient"]
+            if ambient is not None and (not safe_name(ambient) or ambient not in scan_ambient()):
+                return self._send(400, {"error": "unknown ambient sound"})
+            arg = lua_str(ambient) if ambient else "nil"
             ok, out = hs_eval(
-                "spoon.Klonk:_playBed(%s); spoon.Klonk:_refresh(); return 'ok'" % arg)
-            results["bed"] = {"ok": ok, "detail": out}
+                "spoon.Klonk:_playAmbient(%s); spoon.Klonk:_refresh(); return 'ok'" % arg)
+            results["ambient"] = {"ok": ok, "detail": out}
         if not results:
-            return self._send(400, {"error": "nothing to apply (send set and/or bed)"})
+            return self._send(400, {"error": "nothing to apply (send set and/or ambient)"})
         code = 200 if all(r["ok"] for r in results.values()) else 502
         self._send(code, results)
 
@@ -554,11 +556,11 @@ class Handler(BaseHTTPRequestHandler):
     def state(self):
         sets = [describe_set(n, d, src) for n, (d, src) in scan_sets().items()]
         sets.sort(key=lambda s: (CATEGORIES.index(s["category"]), s["name"]))
-        beds = [{k: v for k, v in b.items() if not k.startswith("_")}
-                for b in scan_beds().values()]
+        ambient = [{k: v for k, v in sound.items() if not k.startswith("_")}
+                   for sound in scan_ambient().values()]
         engine, err = engine_state()
         return {
-            "sets": sets, "beds": beds, "categories": CATEGORIES,
+            "sets": sets, "ambient": ambient, "categories": CATEGORIES,
             "fallbackChains": FALLBACK, "voiceCap": VOICE_CAP,
             "hs": {"cli": bool(hs_cli()), "engine": engine, "error": err},
             "dirs": {"sounds": [d for d, _ in SOUND_DIRS],
@@ -571,9 +573,9 @@ def main():
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    n_sets, n_beds = len(scan_sets()), len(scan_beds())
+    n_sets, n_ambient = len(scan_sets()), len(scan_ambient())
     print(f"klonk studio: http://127.0.0.1:{port}  "
-          f"({n_sets} sets, {n_beds} beds, hs CLI {'found' if hs_cli() else 'NOT found — apply disabled'})")
+          f"({n_sets} sets, {n_ambient} ambient sounds, hs CLI {'found' if hs_cli() else 'NOT found — apply disabled'})")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

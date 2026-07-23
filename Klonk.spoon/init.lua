@@ -1,10 +1,10 @@
 --- === Klonk ===
 ---
---- Desktop ambiance for macOS — mechanical keystroke sounds, ambient beds, and a
+--- Desktop ambiance for macOS — mechanical keystroke sounds, ambient sounds, and a
 --- looping video desktop, all from one menu-bar icon.
 ---
 --- Three groups share the same "folder is the config" idea: a keyboard sound set
---- is a folder of WAVs, an ambient bed is a loopable audio file, and a video
+--- is a folder of WAVs, an ambient sound is a loopable audio file, and a video
 --- desktop is a clip you drop in (or an Apple Aerial symlinked in for free).
 ---
 --- A "sound set" is just a folder of WAVs, so the built-in synthesized sets,
@@ -18,7 +18,7 @@
 ---
 --- The menu-bar shows a keyboard icon (dims + slashes when muted). Click it to
 --- toggle sound, toggle mouse clicks, pick a set, or set the volume. Sets are
---- scanned from the bundled `sounds/` folder plus `~/Music/Klonk/Sounds`.
+--- scanned from the bundled `sounds/` folder plus `~/Music/Klonk/keyboard`.
 ---
 --- Download: https://github.com/giantravens/klonk
 
@@ -26,7 +26,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "Klonk"
-obj.version = "2.1"
+obj.version = "2.2"
 obj.author = "Skip Levens"
 obj.homepage = "https://github.com/giantravens/klonk"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
@@ -34,8 +34,8 @@ obj.license = "MIT - https://opensource.org/licenses/MIT"
 --- Klonk.soundDirs
 --- Variable
 --- List of directories scanned for sound sets. Set before `:start()` to
---- customize. Defaults to the bundled `sounds/`, visible `~/Music/Klonk/Sounds`,
---- and the legacy `~/.klonk/sounds` fallback. Earlier directories win.
+--- customize. Defaults to the bundled `sounds/`, unified user library at
+--- `~/Music/Klonk/keyboard`, and legacy fallbacks. Earlier directories win.
 obj.soundDirs = nil
 
 --- Klonk.voices
@@ -51,10 +51,10 @@ obj.voices = 6
 
 --- Klonk.ambientDirs
 --- Variable
---- List of directories scanned for ambient beds — single long, loopable audio
+--- List of directories scanned for ambient sounds — single long, loopable audio
 --- files (rain, wind, surf, a bridge hum) that play under your typing. Defaults
---- to the bundled `ambient/`, visible `~/Music/Klonk/Ambience`, and the legacy
---- `~/.klonk/ambient` fallback. Each file's basename is a bed's menu name.
+--- to the bundled `ambient/`, unified user library at `~/Music/Klonk/ambient`,
+--- and legacy fallbacks. Each file's basename is an ambient sound's menu name.
 obj.ambientDirs = nil
 
 --- Klonk.wallpaperDirs
@@ -62,7 +62,7 @@ obj.ambientDirs = nil
 --- List of directories scanned for video-desktop clips — `.mp4/.mov/.m4v` files
 --- that loop behind the desktop icons. Both work: drop your OWN clips in, or let
 --- `_syncAerials()` symlink Apple's downloaded Aerials in for free. Defaults to
---- `~/Movies/Klonk/Wallpapers`. Each file's basename (minus extension) is a
+--- `~/Music/Klonk/livedesktop`. Each file's basename (minus extension) is a
 --- pick's menu name. Set before `:start()`.
 obj.wallpaperDirs = nil
 
@@ -75,16 +75,19 @@ obj._on    = true
 obj._mouse = true
 obj._vol   = 0.7
 obj._lastScroll = 0
-obj._bed      = nil     -- current ambient bed name (nil = none)
-obj._bedSound = nil     -- the looping hs.sound object
-obj._bedVol   = 0.5
+obj._ambient      = nil -- current ambient sound name (nil = none)
+obj._ambientSound = nil -- the looping hs.sound object
+obj._ambientVol   = 0.5
 obj._audioMuted = false -- one master mute over keyboard/mouse + ambient audio
 obj._wpViews  = {}      -- one webview per screen while a video desktop is active
+obj._wpBackdrops = {}   -- persistent black canvases beneath webviews during swaps
 obj._wp       = nil     -- current video-desktop clip basename (nil = off)
 obj._wpPauseBattery = false
 obj._wpSpeed  = 1.0     -- video-desktop playback rate (1.0 = normal, <1 = slow motion)
 obj._wpChangeMinutes = 0 -- 0 loops the selected clip; otherwise shuffle on this cadence
 obj._wpChangeTimer = nil
+obj._wpApplyGeneration = 0 -- invalidates a pending fade/rebuild when state changes again
+obj._wpFadeTimer = nil
 
 -- Which dedicated file plays for which macOS key code.
 local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
@@ -208,9 +211,9 @@ function obj:_load(name)
   end
 end
 
--- Ambient beds are single loopable files (not folders). List their basenames
+-- Ambient sounds are single loopable files (not folders). List their basenames
 -- across all ambientDirs, de-duped and sorted, so the menu can offer them.
-function obj:_beds()
+function obj:_ambientSounds()
   local seen, out = {}, {}
   for _, dir in ipairs(self.ambientDirs or {}) do
     dir = expand(dir)
@@ -229,8 +232,8 @@ function obj:_beds()
   return out
 end
 
--- Resolve a bed name to a file path (first ambientDir match wins).
-function obj:_bedFile(name)
+-- Resolve an ambient sound name to a file path (first ambientDir match wins).
+function obj:_ambientFile(name)
   for _, dir in ipairs(self.ambientDirs or {}) do
     dir = expand(dir)
     if hs.fs.attributes(dir) then
@@ -241,19 +244,19 @@ function obj:_bedFile(name)
   end
 end
 
--- Swap the looping background bed. name=nil stops it. hs.sound loops natively,
--- so a bed is one long file played on repeat under everything else — it's fully
+-- Swap the looping ambient sound. name=nil stops it. hs.sound loops natively,
+-- so the sound plays on repeat under everything else — it's fully
 -- independent of the keyboard switch, but covered by the top-level audio mute.
-function obj:_playBed(name)
-  if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
-  self._bed = name
+function obj:_playAmbient(name)
+  if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
+  self._ambient = name
   if not name or self._audioMuted then return end
-  local path = self:_bedFile(name)
-  if not path then self._bed = nil; return end
+  local path = self:_ambientFile(name)
+  if not path then self._ambient = nil; return end
   local s = hs.sound.getByFile(path)
   if s then
-    s:loopSound(true); s:volume(self._bedVol); s:play()
-    self._bedSound = s
+    s:loopSound(true); s:volume(self._ambientVol); s:play()
+    self._ambientSound = s
   end
 end
 
@@ -287,8 +290,19 @@ end
 -- Sorenson give error.code 4 — transcode with ffmpeg -c:v libx264 first.
 -- ===========================================================================
 local WP_EXTS     = { mp4 = true, mov = true, m4v = true }
-local WP_SPEEDS   = { 1.0, 0.5, 0.25, 0.1, 0.05 } -- video-desktop playback rates (slow-mo)
+-- playbackRate repeats source frames; it does not synthesize intermediate ones.
+-- Preserve the deep-slow choices as intentional ambient textures while making
+-- their cadence clear. Motion-interpolated/high-frame-rate sources smooth them.
+local WP_SPEEDS   = {
+  { rate = 1.0,  title = "Normal" },
+  { rate = 0.75, title = "0.75× — Gentle" },
+  { rate = 0.5,  title = "0.5× — Calm" },
+  { rate = 0.25, title = "0.25× — Dreamy (best with 120 fps source)" },
+  { rate = 0.1,  title = "0.1× — Deep drift (stepped)" },
+  { rate = 0.05, title = "0.05× — Near-still (slideshow)" },
+}
 local WP_CHANGE_MINUTES = { 0, 20, 60, 120 }     -- 0 = keep looping the selected clip
+local WP_FADE_SECONDS = 0.45                     -- fade old/new frames through black
 -- Apple keeps aerials in TWO stores, and which one a clip lands in depends on how
 -- you added it: the system SCREENSAVER store (idleassetsd, SDR subdirs) vs. the
 -- per-user WALLPAPER store (populated only when you *Activate* an aerial in
@@ -389,11 +403,15 @@ function obj:_writeWallpaperHTML(name)
   local html = table.concat({
     '<!doctype html><html><head><meta charset="utf-8"><style>',
     'html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}',
-    'video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}',
+    'video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;',
+    'opacity:0;transition:opacity ' .. string.format("%.2f", WP_FADE_SECONDS) .. 's ease}',
+    'video.ready{opacity:1}',
     '</style></head><body><video autoplay loop muted playsinline></video><script>',
     'var v=document.querySelector("video"), R=' .. string.format("%.4f", self._wpSpeed) .. ';',
     'v.src=' .. jsString(name) .. '; v.muted=true; v.loop=true;',
-    'function go(){v.playbackRate=R; var p=v.play(); if(p&&p.catch)p.catch(function(){});}',
+    'function go(){v.playbackRate=R; var p=v.play();',
+    'if(p&&p.then)p.then(function(){requestAnimationFrame(function(){v.classList.add("ready")})})',
+    '.catch(function(){});else requestAnimationFrame(function(){v.classList.add("ready")});}',
     'v.addEventListener("canplay",go); go();',
     'v.addEventListener("ended",function(){v.currentTime=0;go();});',
     'document.addEventListener("visibilitychange",function(){if(!document.hidden)go();});',
@@ -403,14 +421,43 @@ function obj:_writeWallpaperHTML(name)
   if fh then fh:write(html); fh:close() end
 end
 
-function obj:_tearDownWallpaper()
+function obj:_tearDownWallpaperViews()
   for _, w in ipairs(self._wpViews) do w:delete() end
   self._wpViews = {}
+end
+
+function obj:_tearDownWallpaper()
+  self:_tearDownWallpaperViews()
+  for _, c in ipairs(self._wpBackdrops) do c:delete() end
+  self._wpBackdrops = {}
+end
+
+-- WKWebView's native surface is briefly white before its HTML paints. Keep an
+-- ordinary black canvas underneath every view so an unloaded/transparent view,
+-- or the gap while views are replaced, can reveal only black.
+function obj:_rebuildWallpaperBackdrops()
+  local old = self._wpBackdrops
+  self._wpBackdrops = {}
+  for _, scr in ipairs(hs.screen.allScreens()) do
+    local frame = scr:fullFrame()
+    local c = hs.canvas.new(frame)
+    c[1] = {
+      type = "rectangle", action = "fill",
+      fillColor = { white = 0, alpha = 1 },
+      frame = { x = 0, y = 0, w = frame.w, h = frame.h },
+    }
+    c:level(hs.canvas.windowLevels.desktopIcon - 2)
+    c:behaviorAsLabels({ "canJoinAllSpaces", "stationary" })
+    c:show()
+    self._wpBackdrops[#self._wpBackdrops + 1] = c
+  end
+  for _, c in ipairs(old) do c:delete() end
 end
 
 function obj:_makeWallpaperView(screen)
   local w = hs.webview.new(screen:fullFrame(), { developerExtrasEnabled = false })
   w:windowStyle(hs.webview.windowMasks.borderless)
+  w:transparent(true)                                      -- reveal black canvas until HTML paints
   w:level(hs.canvas.windowLevels.desktopIcon - 1)              -- behind icons, above wallpaper
   w:behaviorAsLabels({ "canJoinAllSpaces", "stationary" })
   w:allowTextEntry(false)
@@ -418,20 +465,46 @@ function obj:_makeWallpaperView(screen)
 end
 
 function obj:_applyWallpaper()
-  self:_tearDownWallpaper()
-  local name = self._wp
-  if not name then return end
-  local dir = self:_wpDir()
-  if not hs.fs.attributes(dir .. "/" .. name) then            -- clip vanished
-    self._wp = nil; hs.settings.clear("klonk.wallpaper"); return
+  self._wpApplyGeneration = self._wpApplyGeneration + 1
+  if self._wpFadeTimer then self._wpFadeTimer:stop(); self._wpFadeTimer = nil end
+  local generation = self._wpApplyGeneration
+
+  local function rebuild()
+    if generation ~= self._wpApplyGeneration then return end
+    self._wpFadeTimer = nil
+    local name = self._wp
+    if not name then self:_tearDownWallpaper(); return end
+    local dir = self:_wpDir()
+    if not hs.fs.attributes(dir .. "/" .. name) then          -- clip vanished
+      self._wp = nil; hs.settings.clear("klonk.wallpaper")
+      self:_tearDownWallpaper()
+      return
+    end
+    if self._wpPauseBattery and hs.battery.powerSource() == "Battery Power" then
+      self:_tearDownWallpaper()
+      return
+    end
+    -- Show the replacement black layer before removing the faded-out views.
+    self:_rebuildWallpaperBackdrops()
+    self:_tearDownWallpaperViews()
+    self:_writeWallpaperHTML(name)
+    local htmlURL = "file://" .. dir .. "/.klonk-wallpaper.html"
+    for _, scr in ipairs(hs.screen.allScreens()) do
+      local w = self:_makeWallpaperView(scr)
+      w:url(htmlURL); w:show()
+      self._wpViews[#self._wpViews + 1] = w
+    end
   end
-  if self._wpPauseBattery and hs.battery.powerSource() == "Battery Power" then return end
-  self:_writeWallpaperHTML(name)
-  local htmlURL = "file://" .. dir .. "/.klonk-wallpaper.html"
-  for _, scr in ipairs(hs.screen.allScreens()) do
-    local w = self:_makeWallpaperView(scr)
-    w:url(htmlURL); w:show()
-    self._wpViews[#self._wpViews + 1] = w
+
+  if #self._wpViews == 0 then
+    rebuild()
+  else
+    -- The existing webviews stay in place while their videos fade away, so the
+    -- page's black background covers the desktop instead of exposing a white
+    -- WebKit/loading frame. The replacement fades in only after it can play.
+    local js = "var v=document.querySelector('video');if(v){v.classList.remove('ready');}"
+    for _, w in ipairs(self._wpViews) do w:evaluateJavaScript(js) end
+    self._wpFadeTimer = hs.timer.doAfter(WP_FADE_SECONDS, rebuild)
   end
 end
 
@@ -491,8 +564,8 @@ function obj:_refresh()
   hs.settings.set("klonk.mouse", self._mouse)
   hs.settings.set("klonk.set", self._set)
   hs.settings.set("klonk.vol", self._vol)
-  hs.settings.set("klonk.bed", self._bed)
-  hs.settings.set("klonk.bedvol", self._bedVol)
+  hs.settings.set("klonk.ambient", self._ambient)
+  hs.settings.set("klonk.ambientvol", self._ambientVol)
 end
 
 function obj:_menuItems()
@@ -520,7 +593,7 @@ function obj:_menuItems()
       fn = function() self._mouse = not self._mouse; self:_refresh() end },
     { title = "Volume", menu = vol },
     { title = "Add sound sets…", fn = function()
-      local d = expand("~/Music/Klonk/Sounds"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+      local d = expand("~/Music/Klonk/keyboard"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
     end },
     { title = "Get recorded keyboard sounds…", fn = function()
       hs.urlevent.openURL("https://github.com/giantravens/klonk#real-recorded-keyboards")
@@ -551,37 +624,38 @@ function obj:_menuItems()
   end
   -- ---- Ambient sounds -----------------------------------------------------
   -- A looping background soundscape (rain, surf, hum) under the typing.
-  local bvol = {}
+  local ambientVolumes = {}
   for _, v in ipairs(VOLUMES) do
-    bvol[#bvol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
-      checked = (math.abs(v - self._bedVol) < 0.01),
+    ambientVolumes[#ambientVolumes + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
+      checked = (math.abs(v - self._ambientVol) < 0.01),
       fn = function()
-        self._bedVol = v
-        if self._bedSound then self._bedSound:volume(v) end
+        self._ambientVol = v
+        if self._ambientSound then self._ambientSound:volume(v) end
         self:_refresh()
       end }
   end
   local amb = {
-    { title = "Turn ambient sounds off", checked = (self._bed == nil),
-      fn = function() self:_playBed(nil); self:_refresh() end },
-    { title = "Bed volume", menu = bvol },
-    { title = "Add ambient beds…", fn = function()
-      local d = expand("~/Music/Klonk/Ambience"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+    { title = "Turn ambient sounds off", checked = (self._ambient == nil),
+      fn = function() self:_playAmbient(nil); self:_refresh() end },
+    { title = "Ambient sound volume", menu = ambientVolumes },
+    { title = "Add ambient sounds…", fn = function()
+      local d = expand("~/Music/Klonk/ambient"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
     end },
     { title = "-" },
   }
-  for _, b in ipairs(self:_beds()) do
-    amb[#amb + 1] = { title = b, checked = (b == self._bed),
-      fn = function() self:_playBed(b); self:_refresh() end }
+  for _, ambient in ipairs(self:_ambientSounds()) do
+    amb[#amb + 1] = { title = ambient, checked = (ambient == self._ambient),
+      fn = function() self:_playAmbient(ambient); self:_refresh() end }
   end
 
   -- ---- Video desktop ------------------------------------------------------
   -- Loop a scenic clip behind the icons: your own drops, or Apple Aerials.
   local spd = {}
-  for _, r in ipairs(WP_SPEEDS) do
-    spd[#spd + 1] = { title = (r == 1.0 and "Normal" or (tostring(r) .. "×")),
-      checked = (math.abs(r - self._wpSpeed) < 0.001),
-      fn = function() self:_setWallpaperSpeed(r) end }
+  for _, option in ipairs(WP_SPEEDS) do
+    local rate = option.rate
+    spd[#spd + 1] = { title = option.title,
+      checked = (math.abs(rate - self._wpSpeed) < 0.001),
+      fn = function() self:_setWallpaperSpeed(rate) end }
   end
   local cadence = {}
   for _, minutes in ipairs(WP_CHANGE_MINUTES) do
@@ -633,7 +707,7 @@ function obj:_menuItems()
       fn = function() self:_setAudioMuted(not self._audioMuted) end },
     { title = "-" },
     { title = "Keyboard sounds", menu = kb,  checked = self._on },
-    { title = "Ambient sounds",  menu = amb, checked = (self._bed ~= nil) },
+    { title = "Ambient sounds",  menu = amb, checked = (self._ambient ~= nil) },
     { title = "Video desktop",   menu = vid, checked = (self._wp ~= nil) },
   }
 end
@@ -648,9 +722,9 @@ end
 function obj:_setAudioMuted(muted)
   self._audioMuted = muted
   if muted then
-    if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
-  elseif self._bed then
-    self:_playBed(self._bed)
+    if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
+  elseif self._ambient then
+    self:_playAmbient(self._ambient)
   end
   self:_refresh()
 end
@@ -681,12 +755,14 @@ end
 --- Called automatically by `hs.loadSpoon`. Resolves the default sound dirs.
 function obj:init()
   self.soundDirs = self.soundDirs or {
-    hs.spoons.resourcePath("sounds"), "~/Music/Klonk/Sounds", "~/.klonk/sounds"
+    hs.spoons.resourcePath("sounds"), "~/Music/Klonk/keyboard",
+    "~/Music/Klonk/Sounds", "~/.klonk/sounds"
   }
   self.ambientDirs = self.ambientDirs or {
-    hs.spoons.resourcePath("ambient"), "~/Music/Klonk/Ambience", "~/.klonk/ambient"
+    hs.spoons.resourcePath("ambient"), "~/Music/Klonk/ambient",
+    "~/Music/Klonk/Ambience", "~/.klonk/ambient"
   }
-  self.wallpaperDirs = self.wallpaperDirs or { "~/Movies/Klonk/Wallpapers" }
+  self.wallpaperDirs = self.wallpaperDirs or { "~/Music/Klonk/livedesktop" }
   return self
 end
 
@@ -702,7 +778,9 @@ function obj:start()
   local savedSet = hs.settings.get("klonk.set")
   local selected = SET_ALIASES[savedSet] or savedSet
   self._set = selected and self:_setDir(selected) and selected or (self:_sets()[1] or "thock")
-  self._bedVol = hs.settings.get("klonk.bedvol") or 0.5
+  -- Read the pre-2.2 keys once so existing selections survive the terminology
+  -- migration; all subsequent writes use the new ambient keys above.
+  self._ambientVol = hs.settings.get("klonk.ambientvol") or hs.settings.get("klonk.bedvol") or 0.5
 
   local et = hs.eventtap.event.types
   local props = hs.eventtap.event.properties
@@ -759,7 +837,7 @@ function obj:start()
   self._menu = hs.menubar.new()
   self._menu:setMenu(function() return self:_menuItems() end)
   self:_load(self._set)
-  self:_playBed(hs.settings.get("klonk.bed"))   -- resume last ambient bed, if any
+  self:_playAmbient(hs.settings.get("klonk.ambient") or hs.settings.get("klonk.bed"))
 
   -- Video desktop: restore last pick, keep Apple aerials linked, and re-render
   -- on screen-layout / battery changes so the clip tracks the live geometry.
@@ -784,8 +862,10 @@ end
 --- Removes the menu-bar item and stops listening.
 function obj:stop()
   if self._tap then self._tap:stop(); self._tap = nil end
-  if self._bedSound then self._bedSound:stop(); self._bedSound = nil end
+  if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
   if self._wpChangeTimer then self._wpChangeTimer:stop(); self._wpChangeTimer = nil end
+  self._wpApplyGeneration = self._wpApplyGeneration + 1
+  if self._wpFadeTimer then self._wpFadeTimer:stop(); self._wpFadeTimer = nil end
   self:_tearDownWallpaper()
   if self._wpScreen then self._wpScreen:stop(); self._wpScreen = nil end
   if self._wpBattery then self._wpBattery:stop(); self._wpBattery = nil end

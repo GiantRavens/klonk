@@ -1,0 +1,8 @@
+Mechvibes DX keyboard pack: cherrymx-brown-pbt
+Author in pack config: Mechvibes
+Source: https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard/cherrymx-brown-pbt
+Pinned source commit: fa3da3a46985687696bc335714fc7679ea4fe07f
+License: MIT — https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE
+Source audio SHA-256: 10390a4325fe218b005c509cac28c90bdd21c16bfcc303fe57d51d2588efd047
+Source config SHA-256: 6966bc33a52a85d86ab78729590eb0632294c68f4a954e8bbf6f54e3af0d4ab8
+Conversion: eight representative key presses, four authentic key releases, and dedicated Space/Enter/Backspace slices; mono 44.1 kHz 16-bit WAV.

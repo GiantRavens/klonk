@@ -6,10 +6,11 @@ klonk is a Hammerspoon menu-bar item with one icon and three groups, each coveri
 
 Best of all, as a Hammerspoon macOS utility its easily configurable - drop in your own keyboard sounds, videos, ambient soundloops any time.
 
-[Try the keyboard sounds in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
-pick a set and type; it runs the same logic client-side, no install. The test page
-includes Cherry MX Blue, Cherry MX Brown, and Holy Panda recordings so you can
-compare real switches before importing a pack.
+**[Try the keyboard sounds and ambient sounds in your browser](https://giantravens.github.io/klonk/previews/gallery.html)** —
+pick a set and type, then layer a soundscape underneath it; no install needed.
+The test page includes the complete ten-pack Mechvibes DX mechanism collection,
+the earlier Cherry MX Blue/Brown and Holy Panda recordings, and every bundled
+ambient sound.
 
 ---
 
@@ -21,7 +22,7 @@ no login item. klonk renders the clip in an `hs.webview` pinned one level below 
 icon layer (in front of the wallpaper, behind your icons), muted and looped, one
 view per screen, and re-renders when your display layout changes.
 
-Everything lives in `~/Movies/Klonk/Wallpapers`, and the picker scans it for
+Everything lives in `~/Music/Klonk/livedesktop`, and the picker scans it for
 `.mp4` / `.mov` / `.m4v` — whether each entry is a file you dropped or a symlink.
 
 **Drop your own clips.** Any H.264/HEVC clip appears as a pick. WebKit can't decode
@@ -32,7 +33,7 @@ ffmpeg -i in.mov -c:v libx264 -pix_fmt yuv420p -movflags +faststart -an out.mp4
 ```
 
 **Or use Apple's Aerials, zero-copy.** *Sync Apple aerials now* symlinks every
-Aerial macOS has downloaded straight into the folder by its real name — symlinks,
+downloaded Apple **Aerial video** straight into the folder by its real name — symlinks,
 not 250 MB copies, so they cost nothing and always reflect what Apple currently
 ships. It scans **both** places macOS keeps them:
 
@@ -47,12 +48,43 @@ ships. It scans **both** places macOS keeps them:
 
 **Loop or rotate.** By default, the chosen desktop loops continuously. **Shuffle
 now** picks a different clip immediately; **Change desktop** can keep looping the
-selection or choose a different clip every 20, 60, or 120 minutes.
+selection or choose a different clip every 20, 60, or 120 minutes. Each change
+fades the old clip to black, then fades the playable replacement in. Shuffle draws
+from the entire merged folder, so downloaded/synced Apple Aerials and user-supplied
+videos participate together. A persistent black canvas sits beneath the transparent
+video view during each swap, preventing WebKit's briefly unpainted white surface
+from flashing through. It does not include non-video macOS screen savers.
 
-**Slow motion.** The **Speed** submenu — Normal / 0.5× / 0.25× / 0.1× / 0.05× — sets the
-clip's `playbackRate`. Apple's Aerials are high-bitrate cinematic drone footage, so
-0.25× drifts by dreamily instead of stuttering. Speed changes apply *live* to the
-running wallpaper (no restart) and are remembered.
+**Slow motion.** The **Speed** submenu ranges from **0.75× Gentle** and **0.5×
+Calm** through **0.25× Dreamy**, **0.1× Deep drift**, and **0.05× Near-still**.
+Browser playback repeats source frames rather than inventing intermediate ones,
+so the labels call out when the result becomes intentionally stepped: a typical
+30 fps clip retains about 7.5 distinct frames per second at 0.25×, 3 at 0.1×, and
+1.5 at 0.05×. A true 120 fps source remains fluid at 0.25×. Re-encoding a 30 fps
+source as 120 fps only helps if the conversion uses motion interpolation to create
+new frames. Speed changes apply *live* to the running wallpaper (no restart) and
+are remembered.
+
+For a fluid slow wallpaper, `tools/dreamify_video.sh` can create a pre-slowed
+30 fps HEVC copy with either gentle frame blending or motion-compensated optical
+flow. It probes first, predicts duration and size, and asks before encoding:
+
+```sh
+# A 15-minute excerpt becomes a one-hour 1440p loop.
+tools/dreamify_video.sh --start 600 --duration 900 "/path/to/video.mp4"
+
+# Inspect the plan without writing anything.
+tools/dreamify_video.sh --dry-run "/path/to/video.mp4"
+```
+
+Play the resulting `-dreamy-4x.mp4` at **Normal** speed in Klonk.
+
+**Compressor alternative.** Apply an HEVC preset, set the output frame rate to
+30 fps and the output height to 1440, then set **General inspector ▸ Retiming ▸
+Duration** to **400%**. In **Video inspector ▸ Quality ▸ Retiming quality**, use
+**Good (Frame Blending)** for the soft look or **Best (Machine Learning)** on
+Apple silicon for cleaner motion and occlusion handling. Disable audio and test a
+short range before committing the entire clip.
 
 **Battery-aware.** *Pause on battery* stops playback on battery power and resumes on
 AC. Your pick, speed, and this toggle all persist and restore at login — klonk
@@ -86,30 +118,46 @@ spoon.Klonk:bindHotkeys({
 
 Reload Hammerspoon. A keyboard icon appears in the menu bar. **All sounds off**
 mutes keyboard, mouse, and ambient audio together without forgetting the selected
-set or bed. The three groups — **Keyboard sounds**, **Ambient sounds**, and
+set or ambient sound. The three groups — **Keyboard sounds**, **Ambient sounds**, and
 **Video desktop** — put controls first and choosable sounds/media after them, and
 remember your choices across restarts.
 
 macOS will ask to grant Hammerspoon **Accessibility** permission (needed to hear
 keystrokes); klonk only *listens* — it never intercepts or alters your typing.
 
+All personal Klonk media lives together in one visible library:
+
+```text
+~/Music/Klonk/
+├── ambient/       # long looping soundscapes
+├── livedesktop/   # videos and linked Apple Aerials
+└── keyboard/      # one folder per keyboard/input-sound set
+```
+
+Older `Sounds`, `Ambience`, and `~/.klonk` audio locations remain readable as
+migration fallbacks, but every Klonk tool and **Add…** menu now writes to the
+unified library. Existing live-desktop files should be moved once from
+`~/Movies/Klonk/Wallpapers` to `~/Music/Klonk/livedesktop`.
+
 ---
 
 ## The built-in sets
 
-Eight sets are synthesized from scratch by `tools/generate.py`; Telegraph,
-Ping Pong, and Tennis are curated from recordings:
+Seven sets are synthesized from scratch by `tools/generate.py`; Telegraph,
+Ping Pong, and Tennis are curated from recordings; and ten real keyboard packs
+come from Mechvibes DX:
 
 | Family | Sets | Character |
 |---|---|---|
 | Percussive | `thock` `crystal` | deep contact and glass/crystal tings |
 | Mechanical | `telegraph` `console` | recorded sounder actions and chunky old-school console beeps/bops |
 | Keyboard samples | `ping-pong` `tennis` | recorded table-tennis bounces and tennis-ball impacts |
+| Mechvibes DX keyboards | Cherry MX Black/Blue/Brown/Red, Everglide Crystal Purple/Oreo, Topre Purple Hybrid | real press **and release** recordings, including ABS/PBT variants |
 | Musical | `vibraphone` `kalimba` `harpsichord` `jazzy` | notes from a **minor-pentatonic** scale, so random keypresses improvise a melody |
 
 ## Add your own sets
 
-Drop a folder of WAVs into `~/Music/Klonk/Sounds/<name>/` (the menu's **Add sound
+Drop a folder of WAVs into `~/Music/Klonk/keyboard/<name>/` (the menu's **Add sound
 sets…** opens it). The naming convention:
 
 ```
@@ -132,7 +180,7 @@ console blips? `tools/make_set.py` slices, trims, normalizes, and maps them onto
 the whole convention (keys **and** mouse voices) in one shot:
 
 ```sh
-python3 tools/make_set.py ~/sounds/paper calligraph    # -> ~/Music/Klonk/Sounds/calligraph
+python3 tools/make_set.py ~/sounds/paper calligraph    # -> ~/Music/Klonk/keyboard/calligraph
 python3 tools/make_set.py ~/sounds/console console-ui --enter "Working.m4a" --space "Door Chime.aif"
 ```
 
@@ -169,7 +217,7 @@ one-shots for hand-curation. Needs `ffmpeg`.
 
 `tools/studio.py` serves a local page that makes the whole setup visible: a
 keyboard where every key shows which sound it plays, a mouse cluster, and a
-library of all your sets and ambient beds:
+library of all your sets and ambient sounds:
 
 ```sh
 python3 tools/studio.py          # then open http://127.0.0.1:8801
@@ -186,7 +234,7 @@ python3 tools/studio.py          # then open http://127.0.0.1:8801
   recorded keyboards read chunky; the pentatonic musical sets read flowy.
 - **Live apply**: with the Hammerspoon CLI installed (`hs.ipc.cliInstall()`
   once in the HS console), "apply to Mac" switches the running engine to the
-  set or bed you're previewing — the studio header shows what's live.
+  set or ambient sound you're previewing — the studio header shows what's live.
 
 The studio is a *view* over the same folders the Spoon plays — it keeps no
 state of its own, needs no dependencies (Python stdlib only), and binds to
@@ -199,31 +247,62 @@ The studio can also **edit**: click any key, drag its volume, or hit
 crystal's Return ding on a browns keyboard, console's scroll ticks, the
 telegraph clack for right-click. Everything previews live in the page (nothing
 is written while you experiment), and saving compiles the remix into a plain
-set folder in `~/Music/Klonk/Sounds/<name>/`:
+set folder in `~/Music/Klonk/keyboard/<name>/`:
 
 - **Per-sound volume is baked, not configured** — a gain of 60% rewrites the
   WAV's samples at compile time, so the engine plays a quieter file with zero
   new code paths.
 - The recipe is saved alongside as `environment.json`, so an environment stays
   editable (reopen it in the studio, tweak, re-save) and self-describing.
-- An environment can carry its **ambient bed** and a pinned `voices` count;
-  "save + apply" switches the whole mood — keys and bed together.
+- An environment can carry its **ambient sound** and a pinned `voices` count;
+  "save + apply" switches the whole mood — keys and ambient sound together.
 - To the engine an environment is just another set (it appears in the menu
   under **Environments**); deleting one from the studio never touches the
   source sets it borrowed from.
 
-## Ambient beds
+## Ambient sounds
 
 klonk can also play a **looping background soundscape** under your typing — pick
-one from the menu-bar **Ambient sounds** submenu (with its own bed volume). Three CC0
-beds ship synthesized: `rain`, `wind`, `surf`. Drop your own long, loopable audio
-into `~/Music/Klonk/Ambience/<name>.m4a` (waves, a thunderstorm, a starship bridge hum)
-and it joins the list. Beds are independent of the keystroke switch and resume
-across restarts.
+one from the menu-bar **Ambient sounds** submenu (with its own volume). It now
+ships all ten ambience tracks from
+[Mechvibes DX](https://github.com/hainguyents13/mechvibes-dx/tree/main/assets/sounds):
+`chatter`, `cricket`, `fire`, `forest`, `ocean`, `rain`, `river`, `stream`,
+`thunderstorm`, and `wind`. The original CC0 ambient sounds remain available as
+`synth-rain`, `surf`, and `synth-wind`.
+
+Drop your own long, loopable audio into `~/Music/Klonk/ambient/<name>.m4a`
+(waves, a thunderstorm, a starship bridge hum) and it joins the list. Ambient sounds are
+independent of the keystroke switch and resume across restarts. You can audition
+all bundled ambient sounds alongside the keyboard player on the
+[browser preview](https://giantravens.github.io/klonk/previews/gallery.html).
 
 ## Real recorded keyboards
 
-The easiest source is the open-source
+Ten real mechanism/material combinations now ship with Klonk, converted from the
+[Mechvibes DX keyboard collection](https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard):
+
+- Cherry MX Black, Blue, and Brown with both ABS and PBT keycaps
+- Cherry MX Red with ABS keycaps
+- Everglide Crystal Purple and Everglide Oreo
+- Topre Purple Hybrid with PBT keycaps
+
+Each set preserves eight distinct presses, four authentic releases, and dedicated
+Space, Return, and Backspace recordings. The conversion tool observes every v2
+pack before running, predicts its output, then reports actual counts and failure
+classes:
+
+```sh
+git clone https://github.com/hainguyents13/mechvibes-dx.git /tmp/mechvibes-dx
+python3 tools/import_dx_keyboards.py --source /tmp/mechvibes-dx
+python3 tools/build_gallery.py
+```
+
+Every generated folder contains a `SOURCE.txt` with the upstream pack link,
+pinned commit, license, source-audio hash, and source-config hash. Recordings and
+pack configs are credited to [Hải Nguyễn](https://github.com/hainguyents13) and
+Mechvibes DX under its [MIT license](https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE).
+
+For additional older community packs, the easiest source is the open-source
 [Mechvibes sound-pack library on GitHub](https://github.com/hainguyents13/mechvibes).
 Its packs contain recordings of real switches such as Cherry MX Blue, Cherry MX
 Brown, and Holy Panda. **Recording credits:** the Cherry MX Blue and Cherry MX
@@ -232,7 +311,7 @@ Mechvibes. The Holy Panda recordings are by
 [Thomas Lai](https://github.com/tplai/kbsim); [Rob Landers](https://github.com/withinboredom)
 adapted that pack for Mechvibes. You do not need to find or rearrange the audio yourself:
 `tools/import_pack.py` downloads a named pack, converts it to Klonk's WAV layout,
-and installs it in `~/Music/Klonk/Sounds/`. It can also download a CC0 typewriter
+and installs it in `~/Music/Klonk/keyboard/`. It can also download a CC0 typewriter
 bell and bake it into a set's Return:
 
 ```sh
@@ -305,11 +384,23 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
 - **Synthesized bundled sounds** (`Klonk.spoon/sounds/`): originals released
   **CC0** (public domain) — use them anywhere. Recorded sets carry a `SOURCE.txt`
   beside their audio.
+- **Ambient collection** (`Klonk.spoon/ambient/`): the `synth-*` WAVs are Klonk
+  originals released as **CC0**. The other ten tracks come unchanged from
+  [Mechvibes DX](https://github.com/hainguyents13/mechvibes-dx/tree/main/assets/sounds),
+  copyright © 2026 [Hải Nguyễn](https://github.com/hainguyents13), under its
+  [MIT license](https://github.com/hainguyents13/mechvibes-dx/blob/main/LICENSE).
+  See [`Klonk.spoon/ambient/SOURCE.md`](Klonk.spoon/ambient/SOURCE.md) for the
+  pinned source commit, hashes, and credits found in the files' metadata.
 - **Recorded-keyboard previews** (`previews/recorded-keyboards/`): Cherry MX Blue
   and Brown recordings by [Hải Nguyễn](https://github.com/hainguyents13); Holy
   Panda recordings by [Thomas Lai](https://github.com/tplai/kbsim), adapted for
   Mechvibes by [Rob Landers](https://github.com/withinboredom). The MIT-licensed
   packs are converted and embedded in the browser test, not installed with the Spoon.
+- **Bundled mechanism recordings** (`Klonk.spoon/sounds/cherrymx-*`,
+  `Klonk.spoon/sounds/eg-*`, and `Klonk.spoon/sounds/topre-*`): converted from
+  [Mechvibes DX's keyboard packs](https://github.com/hainguyents13/mechvibes-dx/tree/main/soundpacks/keyboard),
+  copyright © 2026 [Hải Nguyễn](https://github.com/hainguyents13), MIT. Each
+  set's `SOURCE.txt` records the exact upstream pack, commit, and input hashes.
 - **`import_pack.py`** downloads, into *your* machine, third-party audio you
   should credit yourself: Mechvibes packs (MIT,
   [hainguyents13/mechvibes](https://github.com/hainguyents13/mechvibes)) and a

@@ -40,7 +40,7 @@ pack = sys.argv[1] if len(sys.argv) > 1 else "cherrymx-blue-pbt"
 setname = sys.argv[2] if len(sys.argv) > 2 else "blues"
 # imported sets land in your personal klonk dir (not the shipped Spoon), so
 # third-party recordings never end up in the repo. Override with $KLONK_SOUNDS.
-base = os.path.abspath(os.environ.get("KLONK_SOUNDS", os.path.expanduser("~/Music/Klonk/Sounds")))
+base = os.path.abspath(os.environ.get("KLONK_SOUNDS", os.path.expanduser("~/Music/Klonk/keyboard")))
 out = os.path.join(base, setname)
 os.makedirs(out, exist_ok=True)
 # Imported packs are real keyboard recordings — declare the family so the

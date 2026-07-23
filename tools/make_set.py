@@ -14,7 +14,7 @@ voices included:
 
 Observe-before-act: it first prints a MANIFEST (each input's duration + peak) and
 the role assignment, so you see its decisions before trusting the audio. Imported
-audio lands in ~/Music/Klonk/Sounds (never the repo) — override with $KLONK_SOUNDS.
+audio lands in ~/Music/Klonk/keyboard (never the repo) — override with $KLONK_SOUNDS.
 
     python3 tools/make_set.py <source_dir> <set_name> [--bell] [--maxdown N]
 
@@ -25,7 +25,7 @@ import math, os, struct, subprocess, sys, tempfile, wave
 SR = 44100
 AUDIO_EXT = (".wav", ".mp3", ".aif", ".aiff", ".m4a", ".mov", ".flac", ".ogg", ".caf")
 
-base = os.path.abspath(os.environ.get("KLONK_SOUNDS", os.path.expanduser("~/Music/Klonk/Sounds")))
+base = os.path.abspath(os.environ.get("KLONK_SOUNDS", os.path.expanduser("~/Music/Klonk/keyboard")))
 
 
 def decode(path):

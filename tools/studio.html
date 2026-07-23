@@ -113,12 +113,12 @@
     background:linear-gradient(90deg, var(--gold), #8a8f98 50%, var(--accent)); opacity:.8; }
   .minimeter .pin { position:absolute; top:-2px; width:3px; height:8px; border-radius:1.5px;
                     background:var(--ink); }
-  .bedrow { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:9px; }
-  .bedrow:hover { background:var(--panel); }
-  .bedrow .nm { flex:1; font-size:12.5px; color:var(--dim);
+  .ambientrow { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:9px; }
+  .ambientrow:hover { background:var(--panel); }
+  .ambientrow .nm { flex:1; font-size:12.5px; color:var(--dim);
                 white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .bedrow.playing .nm { color:var(--ink); }
-  .bedrow .dur { font-size:10.5px; color:var(--faint); }
+  .ambientrow.playing .nm { color:var(--ink); }
+  .ambientrow .dur { font-size:10.5px; color:var(--faint); }
   .icon { border:1px solid var(--edge2); border-radius:6px; background:none; width:26px;
           height:22px; color:var(--dim); font-size:10px; padding:0; }
   .icon.active { color:var(--ok); border-color:var(--ok); }
@@ -192,8 +192,8 @@
 
   <aside id="side">
     <div id="setlist"></div>
-    <h2>ambient beds</h2>
-    <div id="bedlist"></div>
+    <h2>ambient sounds</h2>
+    <div id="ambientlist"></div>
   </aside>
 </main>
 
@@ -207,7 +207,7 @@
 <div id="draftbar">
   <span class="changes" id="draftinfo"></span>
   <label>name <input type="text" id="draftname" placeholder="e.g. writing"></label>
-  <label>bed <select id="draftbed"></select></label>
+  <label>ambient sound <select id="draftambient"></select></label>
   <label>voices <select id="draftvoices"></select></label>
   <div class="spacer"></div>
   <button onclick="saveDraft(false)">save</button>
@@ -217,7 +217,7 @@
 <div id="toast"></div>
 
 <script>
-let STATE = null, current = null, vol = 0.7, bedAudio = null, bedPlaying = null;
+let STATE = null, current = null, vol = 0.7, ambientAudio = null, ambientPlaying = null;
 let draft = null, editingRole = null;
 
 const $ = s => document.querySelector(s);
@@ -250,7 +250,7 @@ function ensureDraft() {
     draft = JSON.parse(JSON.stringify(current.environment));   // edit the recipe
     draft.roles = draft.roles || {};
   } else {
-    draft = { name: "", base: current.name, roles: {}, bed: bedPlaying,
+    draft = { name: "", base: current.name, roles: {}, ambient: ambientPlaying,
               voices: current.voicesOverride };
   }
   draft.view = current.name;
@@ -374,8 +374,8 @@ function showSet(set) {
              `<button id="delenv" class="danger">delete</button>` : "") +
     `<button id="applyset" class="primary">apply to Mac</button>`;
   $("#applyset").disabled = !(STATE.hs && STATE.hs.cli);
-  $("#applyset").onclick = () => apply(isEnv && set.environment.bed
-    ? { set: set.name, bed: set.environment.bed } : { set: set.name });
+  $("#applyset").onclick = () => apply(isEnv && set.environment.ambient
+    ? { set: set.name, ambient: set.environment.ambient } : { set: set.name });
   if (isEnv) {
     $("#editenv").onclick = () => { ensureDraft(); paintKeyboard(); };
     $("#delenv").onclick = async () => {
@@ -549,7 +549,7 @@ function assign(role, ref) {
   playRole(current, role);                  // instant preview of the assignment
 }
 
-// ---- draft bar: name it, pick a bed, save = compile a real set folder
+// ---- draft bar: name it, pick an ambient sound, save = compile a real set folder
 function renderDraftbar() {
   const bar = $("#draftbar");
   if (!draft) { bar.classList.remove("show"); return; }
@@ -557,10 +557,10 @@ function renderDraftbar() {
   const n = Object.keys(draft.roles).length;
   $("#draftinfo").textContent = `✎ remix of ${draft.base} — ${n} change${n === 1 ? "" : "s"}`;
   if (document.activeElement !== $("#draftname")) $("#draftname").value = draft.name || "";
-  const bedSel = $("#draftbed");
-  bedSel.innerHTML = `<option value="">none</option>` +
-    STATE.beds.map(b => `<option${b.name === draft.bed ? " selected" : ""}>${b.name}</option>`).join("");
-  bedSel.onchange = () => draft.bed = bedSel.value || null;
+  const ambientSel = $("#draftambient");
+  ambientSel.innerHTML = `<option value="">none</option>` +
+    STATE.ambient.map(sound => `<option${sound.name === draft.ambient ? " selected" : ""}>${sound.name}</option>`).join("");
+  ambientSel.onchange = () => draft.ambient = ambientSel.value || null;
   const vSel = $("#draftvoices");
   vSel.innerHTML = `<option value="">auto</option>` +
     [1,2,3,4,5,6].map(v => `<option${v === draft.voices ? " selected" : ""}>${v}</option>`).join("");
@@ -573,7 +573,7 @@ async function saveDraft(applyAfter) {
   if (!name) { toast("give the environment a name first"); $("#draftname").focus(); return; }
   draft.name = name;
   const body = { name, base: draft.base, roles: draft.roles,
-                 bed: draft.bed || null, voices: draft.voices || null };
+                 ambient: draft.ambient || null, voices: draft.voices || null };
   try {
     const r = await fetch("/api/environment", { method: "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -587,7 +587,7 @@ async function saveDraft(applyAfter) {
     const saved = setByName(name);
     if (saved) showSet(saved);
     renderDraftbar();
-    if (applyAfter) apply(body.bed ? { set: name, bed: body.bed } : { set: name });
+    if (applyAfter) apply(body.ambient ? { set: name, ambient: body.ambient } : { set: name });
   } catch (e) { toast("save failed: " + e); }
 }
 
@@ -611,42 +611,42 @@ function buildSide() {
       box.appendChild(row);
     }
   }
-  const beds = $("#bedlist"); beds.innerHTML = "";
-  for (const b of STATE.beds) {
+  const ambient = $("#ambientlist"); ambient.innerHTML = "";
+  for (const sound of STATE.ambient) {
     const row = document.createElement("div");
-    row.className = "bedrow"; row.dataset.name = b.name;
-    const mins = b.dur ? Math.round(b.dur / 60) + "m" : "";
+    row.className = "ambientrow"; row.dataset.name = sound.name;
+    const mins = sound.dur ? Math.round(sound.dur / 60) + "m" : "";
     row.innerHTML =
       `<button class="icon prev" title="preview">▶</button>` +
-      `<span class="nm">${b.name}</span><span class="dur">${mins}</span>` +
-      `<button class="icon applybed" title="play on Mac">⌘</button>`;
-    row.querySelector(".prev").onclick = () => toggleBed(b, row);
-    const ab = row.querySelector(".applybed");
-    ab.disabled = !(STATE.hs && STATE.hs.cli);
-    ab.onclick = () => apply({ bed: b.name });
-    beds.appendChild(row);
+      `<span class="nm">${sound.name}</span><span class="dur">${mins}</span>` +
+      `<button class="icon applyambient" title="play on Mac">⌘</button>`;
+    row.querySelector(".prev").onclick = () => toggleAmbient(sound, row);
+    const applyButton = row.querySelector(".applyambient");
+    applyButton.disabled = !(STATE.hs && STATE.hs.cli);
+    applyButton.onclick = () => apply({ ambient: sound.name });
+    ambient.appendChild(row);
   }
-  if (STATE.beds.length) {
+  if (STATE.ambient.length) {
     const stop = document.createElement("div");
-    stop.className = "bedrow";
-    stop.innerHTML = `<button class="icon">■</button><span class="nm">none (stop bed on Mac)</span>`;
-    stop.querySelector("button").onclick = () => apply({ bed: null });
+    stop.className = "ambientrow";
+    stop.innerHTML = `<button class="icon">■</button><span class="nm">none (stop ambient sound on Mac)</span>`;
+    stop.querySelector("button").onclick = () => apply({ ambient: null });
     if (!(STATE.hs && STATE.hs.cli)) stop.querySelector("button").disabled = true;
-    beds.appendChild(stop);
+    ambient.appendChild(stop);
   }
 }
 
-function toggleBed(b, row) {
-  if (bedAudio) { bedAudio.pause(); bedAudio = null; }
-  document.querySelectorAll(".bedrow").forEach(r => {
+function toggleAmbient(sound, row) {
+  if (ambientAudio) { ambientAudio.pause(); ambientAudio = null; }
+  document.querySelectorAll(".ambientrow").forEach(r => {
     r.classList.remove("playing");
     const p = r.querySelector(".prev"); if (p) { p.textContent = "▶"; p.classList.remove("active"); }
   });
-  if (bedPlaying === b.name) { bedPlaying = null; return; }
-  bedPlaying = b.name;
-  bedAudio = new Audio(`/audio/bed/${esc(b.name)}`);
-  bedAudio.loop = true; bedAudio.volume = 0.5 * vol;
-  bedAudio.play().catch(()=>{});
+  if (ambientPlaying === sound.name) { ambientPlaying = null; return; }
+  ambientPlaying = sound.name;
+  ambientAudio = new Audio(`/audio/ambient/${esc(sound.name)}`);
+  ambientAudio.loop = true; ambientAudio.volume = 0.5 * vol;
+  ambientAudio.play().catch(()=>{});
   row.classList.add("playing");
   const p = row.querySelector(".prev"); p.textContent = "❚❚"; p.classList.add("active");
 }
@@ -658,7 +658,7 @@ function paintEngine() {
   if (hs.engine) {
     el.classList.add("live");
     txt.textContent = `live — ${hs.engine.set || "?"}` +
-      (hs.engine.bed ? ` + ${hs.engine.bed}` : "") + (hs.engine.on ? "" : " (muted)");
+      (hs.engine.ambient ? ` + ${hs.engine.ambient}` : "") + (hs.engine.on ? "" : " (muted)");
   } else if (hs.cli) {
     el.classList.remove("live");
     txt.textContent = "hs found, engine unreachable — is Klonk loaded?";
@@ -706,7 +706,7 @@ $("#pad").addEventListener("keyup", e => {
 });
 $("#vol").addEventListener("input", e => {
   vol = parseFloat(e.target.value);
-  if (bedAudio) bedAudio.volume = 0.5 * vol;
+  if (ambientAudio) ambientAudio.volume = 0.5 * vol;
 });
 
 async function refresh(first) {

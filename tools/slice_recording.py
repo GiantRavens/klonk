@@ -24,7 +24,7 @@ what you heard, then run for real.
 Piezo notes: set Piezo's source to the APP making the sound (Safari for a web
 page, Hammerspoon for live klonk playback), not a microphone. Any format Piezo
 saves works — decoding goes through ffmpeg (brew install ffmpeg). Recordings
-land in ~/Music/Piezo by default. The set lands in ~/Music/Klonk/Sounds/<set_name>
+land in ~/Music/Piezo by default. The set lands in ~/Music/Klonk/keyboard/<set_name>
 (override with $KLONK_SOUNDS), never in the repo.
 """
 import os
