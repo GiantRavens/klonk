@@ -43,7 +43,9 @@ AUDIO_RE_EXT = (".wav", ".aif", ".aiff", ".mp3")          # what the engine load
 AMBIENT_EXT = (".wav", ".mp3", ".aif", ".aiff", ".m4a")
 GENERIC = {"down", "up", "click", "clickup", "rightclick", "scroll"}
 DEDICATED = {"space", "enter", "backspace"}
-CATEGORIES = ["environment", "samples", "mechanical", "themed", "musical", "other"]
+CATEGORIES = [
+    "environment", "keyboard", "percussive", "mechanical", "musical", "themed", "other",
+]
 VOICE_CAP = 6                                              # Klonk.voices default
 
 # Fallback chains, exactly as the play() calls in init.lua:start().
@@ -149,6 +151,8 @@ def scan_sets():
 def describe_set(name, setdir, source):
     cat_raw = read_sidecar(setdir, "category") or ""
     cat = cat_raw.split()[0].lower() if cat_raw.split() else "other"
+    if cat == "samples":  # compatibility with personal sets created before 2.3
+        cat = "keyboard"
     if cat not in CATEGORIES:
         cat = "other"
     voices_raw = read_sidecar(setdir, "voices")
@@ -420,7 +424,13 @@ def delete_environment(name):
 # ---------------------------------------------------------------- hammerspoon
 
 def hs_cli():
-    return shutil.which("hs")
+    found = shutil.which("hs")
+    if found:
+        return found
+    for path in ("/opt/homebrew/bin/hs", "/usr/local/bin/hs"):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
 
 
 def hs_eval(lua):
@@ -429,7 +439,10 @@ def hs_eval(lua):
     if not cli:
         return False, "hs CLI not installed (run hs.ipc.cliInstall() in the HS console)"
     try:
-        r = subprocess.run([cli, "-c", lua], capture_output=True, text=True, timeout=5)
+        command = [cli, "-c", lua]
+        if os.path.isfile("/bin/launchctl"):
+            command = ["/bin/launchctl", "asuser", str(os.getuid())] + command
+        r = subprocess.run(command, capture_output=True, text=True, timeout=12)
         if r.returncode != 0:
             return False, (r.stderr or r.stdout).strip()
         return True, r.stdout.strip()

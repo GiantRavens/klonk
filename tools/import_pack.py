@@ -44,9 +44,9 @@ base = os.path.abspath(os.environ.get("KLONK_SOUNDS", os.path.expanduser("~/Musi
 out = os.path.join(base, setname)
 os.makedirs(out, exist_ok=True)
 # Imported packs are real keyboard recordings — declare the family so the
-# menu groups them under "Keyboard samples" (see tools/generate.py tag()).
+# menu groups them under "Recorded keyboards" (see tools/generate.py tag()).
 with open(os.path.join(out, "category"), "w") as f:
-    f.write("samples\n")
+    f.write("keyboard\n")
 
 def curl(url, dest):
     subprocess.run(["curl", "-sSfL", "-m", "30", "-o", dest, url], check=True)

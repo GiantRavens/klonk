@@ -125,7 +125,7 @@ def convert(item, out_root):
             write_wav(out / filename,
                       slice_samples(samples, rate, definitions[key]["timing"][0]), rate)
 
-    (out / "category").write_text("samples\n")
+    (out / "category").write_text("keyboard\n")
     (out / "voices").write_text("1\n")
     (out / "SOURCE.txt").write_text(
         f"Mechvibes DX keyboard pack: {pack}\n"

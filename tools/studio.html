@@ -593,8 +593,11 @@ async function saveDraft(applyAfter) {
 
 // ---- sidebar
 function buildSide() {
-  const catLabels = { environment:"environments", samples:"keyboard samples",
-                      mechanical:"mechanical", themed:"themed", musical:"musical", other:"more sets" };
+  const catLabels = {
+    environment:"environments", keyboard:"recorded keyboards",
+    percussive:"percussive objects", mechanical:"machines & mechanisms",
+    musical:"musical instruments", themed:"playful effects", other:"more sets"
+  };
   const box = $("#setlist"); box.innerHTML = "";
   for (const cat of STATE.categories) {
     const sets = STATE.sets.filter(s => s.category === cat);

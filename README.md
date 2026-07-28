@@ -1,6 +1,7 @@
 # ⌨ klonk
 
-**Desktop ambiance for macOS — mechanical keystroke sounds, ambient soundscapes, even a live video ON YOUR DESKTOP.**
+**Desktop ambiance for macOS — mechanical keystroke sounds, ambient soundscapes,
+a live video ON YOUR DESKTOP, and a presenter mode that makes input visible.**
 
 klonk is a Hammerspoon menu-bar item with one icon and three groups, each covering different aspects of how you want to curate your Mac's working environment. Want cool keyboard sounds? Weird keyboard sounds? How about an ambient soundtrack of the beach, city life, or favorite sci-fi while you work. And how about we paint a moving desktop on your screen that simply taps into the existing Apple screensaver videos.
 
@@ -111,6 +112,7 @@ spoon.Klonk:start()
 spoon.Klonk:bindHotkeys({
   toggle      = {{"cmd", "alt"}, "k"},   -- mute/unmute everything
   toggleMouse = {{"cmd", "alt"}, "m"},   -- mute/unmute mouse clicks + scroll
+  togglePresenter = {{"cmd", "alt"}, "p"}, -- show keys and highlight clicks
   nextSet     = {{"cmd", "alt"}, "]"},   -- next set
   prevSet     = {{"cmd", "alt"}, "["},   -- previous set
 })
@@ -119,11 +121,43 @@ spoon.Klonk:bindHotkeys({
 Reload Hammerspoon. A keyboard icon appears in the menu bar. **All sounds off**
 mutes keyboard, mouse, and ambient audio together without forgetting the selected
 set or ambient sound. The three groups — **Keyboard sounds**, **Ambient sounds**, and
-**Video desktop** — put controls first and choosable sounds/media after them, and
-remember your choices across restarts.
+**Video desktop** — keep only the current selection, off/switch actions, five
+recent choices, and **Browse all / Controls / Library** at the first level.
+Keyboard sets are grouped by character; ambient sounds split into Klonk's
+included collection and your library; videos split into Apple Aerials and your
+clips. Recent choices persist across restarts. Use **Open Klonk Studio…** at the
+bottom of the menu when you want to search, audition, compare, or remix the full
+collection.
 
 macOS will ask to grant Hammerspoon **Accessibility** permission (needed to hear
 keystrokes); klonk only *listens* — it never intercepts or alters your typing.
+
+## Presenter mode
+
+Choose **Presenter mode → Start** in the Klonk menu, or bind
+`togglePresenter`, when sharing or recording your desktop. Klonk shows recent
+key presses in a centered HUD, preserving the character actually produced
+(`a` versus `A`), and flashes a translucent neutral-gray halo around clicks. The overlays
+follow the display where you are working and
+remain active if Klonk's sounds are muted.
+Right-click uses the same halo with a small **R** badge in its upper-right edge;
+left-click keeps the ring unmarked.
+
+Special keys held together appear as one evolving chord—`⌘+⌥`,
+`⌘+⌥+fn`, or `⌘+c`. Ordinary characters remain separate history elements
+even when their physical key-down times overlap during fast typing, so Klonk
+never turns normal letter sequences into `a+s`.
+
+Under **Presenter mode → Keys shown**, choose **All keys** or **Special keys
+only**. The latter keeps navigation, editing keys, function keys, modifiers,
+and keyboard shortcuts visible while suppressing ordinary typed characters.
+Klonk remembers this filter, but not whether presenter mode itself is running.
+
+Presenter mode is intentionally session-only: it always starts off after a
+Hammerspoon reload or restart so keystrokes are never exposed by surprise.
+Password fields and other apps using macOS Secure Input may suppress key events;
+Klonk warns if Secure Input is already active when presenter mode starts. The
+event listener and visual overlays are observe-only and never intercept input.
 
 All personal Klonk media lives together in one visible library:
 
@@ -143,17 +177,19 @@ unified library. Existing live-desktop files should be moved once from
 
 ## The built-in sets
 
-Seven sets are synthesized from scratch by `tools/generate.py`; Telegraph,
-Ping Pong, and Tennis are curated from recordings; and ten real keyboard packs
-come from Mechvibes DX:
+The menu taxonomy describes how a set feels and where its sound comes from,
+rather than putting every recording into one oversized “samples” bucket:
 
 | Family | Sets | Character |
 |---|---|---|
-| Percussive | `thock` `crystal` | deep contact and glass/crystal tings |
-| Mechanical | `telegraph` `console` | recorded sounder actions and chunky old-school console beeps/bops |
-| Keyboard samples | `ping-pong` `tennis` | recorded table-tennis bounces and tennis-ball impacts |
-| Mechvibes DX keyboards | Cherry MX Black/Blue/Brown/Red, Everglide Crystal Purple/Oreo, Topre Purple Hybrid | real press **and release** recordings, including ABS/PBT variants |
-| Musical | `vibraphone` `kalimba` `harpsichord` `jazzy` | notes from a **minor-pentatonic** scale, so random keypresses improvise a melody |
+| Recorded keyboards | Cherry MX Black/Blue/Brown/Red, Everglide Crystal Purple/Oreo, Topre Purple Hybrid | real press **and release** recordings, including ABS/PBT variants |
+| Percussive objects | `ping-pong` `tennis` | recorded table-tennis bounces and tennis-ball impacts |
+| Machines & mechanisms | `thock` `crystal` `telegraph` `console` | contact, glass, sounder actions, and chunky console blips |
+| Musical instruments | `vibraphone` `kalimba` `harpsichord` `jazzy` | minor-pentatonic notes, so random keypresses improvise a melody |
+| Playful effects | `calligraph` `lcars` `pingpong` `spark` `splash` | more strongly themed input-sound worlds |
+
+Saved Studio remixes appear first under **Environments**. Older personal sets
+tagged `samples` are read as **Recorded keyboards** automatically.
 
 ## Add your own sets
 
@@ -215,9 +251,10 @@ one-shots for hand-curation. Needs `ffmpeg`.
 
 ## The studio — see and organize your sound world
 
-`tools/studio.py` serves a local page that makes the whole setup visible: a
+Choose **Open Klonk Studio…** in the menubar to start its localhost server on
+demand and open it in your browser. The Studio makes the whole setup visible: a
 keyboard where every key shows which sound it plays, a mouse cluster, and a
-library of all your sets and ambient sounds:
+library of all your sets and ambient sounds. It can also be started manually:
 
 ```sh
 python3 tools/studio.py          # then open http://127.0.0.1:8801
@@ -348,6 +385,9 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
 - **Zero idle cost.** A set is preloaded into `hs.sound` objects when selected,
   so a keystroke is a table lookup + play with no disk I/O. The `eventtap` is
   observe-only (`return false`) — it hears keys, never swallows them.
+- **One listener, two outputs.** Presenter mode and input sounds share that
+  event tap. Muting sounds disables audio work without blinding presenter mode;
+  turning presenter mode off removes its HUD and any in-flight click rings.
 - **Return is per-set.** Each set's Return sound lives in its own `enter.wav`:
   Console uses a drum-pad action without a ding, Telegraph uses a recorded
   physical action, and musical sets can run a glissando — no universal overlay.

@@ -26,7 +26,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "Klonk"
-obj.version = "2.2"
+obj.version = "2.4"
 obj.author = "Skip Levens"
 obj.homepage = "https://github.com/giantravens/klonk"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
@@ -78,6 +78,9 @@ obj._lastScroll = 0
 obj._ambient      = nil -- current ambient sound name (nil = none)
 obj._ambientSound = nil -- the looping hs.sound object
 obj._ambientVol   = 0.5
+obj._recentSets = {}
+obj._recentAmbient = {}
+obj._recentWallpapers = {}
 obj._audioMuted = false -- one master mute over keyboard/mouse + ambient audio
 obj._wpViews  = {}      -- one webview per screen while a video desktop is active
 obj._wpBackdrops = {}   -- persistent black canvases beneath webviews during swaps
@@ -88,6 +91,24 @@ obj._wpChangeMinutes = 0 -- 0 loops the selected clip; otherwise shuffle on this
 obj._wpChangeTimer = nil
 obj._wpApplyGeneration = 0 -- invalidates a pending fade/rebuild when state changes again
 obj._wpFadeTimer = nil
+obj._presenter = false     -- intentionally session-only: never reveal keys after a restart
+obj._presenterSpecialOnly = false
+obj._presenterHUD = nil
+obj._presenterHUDTimer = nil
+obj._presenterRenderTimer = nil
+obj._presenterKeys = {}
+obj._presenterLastKey = 0
+obj._presenterFlags = {}
+obj._presenterModifierChord = nil
+obj._presenterRings = {}
+obj._presenterClickQueue = {}
+obj._presenterTapWatchTimer = nil
+obj._presenterTapRecoveries = 0
+obj._eventTapMaxSeconds = 0
+obj._eventTapEvents = 0
+obj._audioQueue = {}
+obj._audioDrainTimer = nil
+obj._audioQueueDrops = 0
 
 -- Which dedicated file plays for which macOS key code.
 local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
@@ -101,8 +122,35 @@ local VOLUMES = { 0.3, 0.5, 0.7, 1.0 }
 local SET_ALIASES = { clicky = "crystal", manual = "console",
                       paper = "calligraph", water = "splash" }
 local SCROLL_GAP = 0.05   -- min seconds between scroll ticks (trackpad throttle)
+local RECENT_LIMIT = 5
+local STUDIO_LABEL = "com.giantravens.klonk-studio"
+local PRESENTER_KEY_GAP = 1.4
+local PRESENTER_KEY_LIMIT = 6
+local AUDIO_QUEUE_LIMIT = 32
 
 local function expand(p) return (p:gsub("^~", os.getenv("HOME"))) end
+
+local function listContains(items, wanted)
+  for _, item in ipairs(items) do if item == wanted then return true end end
+  return false
+end
+
+local function settingsList(key)
+  local value = hs.settings.get(key)
+  return type(value) == "table" and value or {}
+end
+
+-- Keep a short MRU list for each large media library. Missing files are filtered
+-- when the menu is built, so removable/user-edited libraries need no migration.
+function obj:_rememberRecent(field, settingsKey, value)
+  if not value then return end
+  local previous, nextItems = self[field] or {}, { value }
+  for _, item in ipairs(previous) do
+    if item ~= value and #nextItems < RECENT_LIMIT then nextItems[#nextItems + 1] = item end
+  end
+  self[field] = nextItems
+  hs.settings.set(settingsKey, nextItems)
+end
 
 -- Unique set names across all soundDirs, sorted.
 function obj:_sets()
@@ -136,12 +184,13 @@ end
 -- of real switches). The menu groups by reading it, so there's no hardcoded
 -- name→family map to drift; untagged or unknown sets land in "More sets".
 local CATEGORIES = {
-  { key = "environment", label = "Environments"     },
-  { key = "samples",    label = "Keyboard samples" },
-  { key = "mechanical", label = "Mechanical"       },
-  { key = "themed",     label = "Themed"           },
-  { key = "musical",    label = "Musical"          },
-  { key = "other",      label = "More sets"        },
+  { key = "environment", label = "Environments"          },
+  { key = "keyboard",    label = "Recorded keyboards"    },
+  { key = "percussive",  label = "Percussive objects"    },
+  { key = "mechanical",  label = "Machines & mechanisms" },
+  { key = "musical",     label = "Musical instruments"   },
+  { key = "themed",      label = "Playful effects"       },
+  { key = "other",       label = "More sets"             },
 }
 
 function obj:_category(name)
@@ -150,6 +199,7 @@ function obj:_category(name)
   if not f then return "other" end
   local c = ((f:read("*a") or ""):match("%a+") or ""):lower()
   f:close()
+  if c == "samples" then c = "keyboard" end -- pre-2.3 compatibility
   for _, cat in ipairs(CATEGORIES) do if cat.key == c then return c end end
   return "other"
 end
@@ -186,6 +236,7 @@ end
 
 function obj:_load(name)
   self._set = name
+  self:_rememberRecent("_recentSets", "klonk.recentsets", name)
   self._pool = {}
   local dir = self:_setDir(name)
   if not dir then return end
@@ -250,6 +301,7 @@ end
 function obj:_playAmbient(name)
   if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
   self._ambient = name
+  self:_rememberRecent("_recentAmbient", "klonk.recentambient", name)
   if not name or self._audioMuted then return end
   local path = self:_ambientFile(name)
   if not path then self._ambient = nil; return end
@@ -510,6 +562,7 @@ end
 
 function obj:_setWallpaper(name, keepSchedule)
   self._wp = name
+  self:_rememberRecent("_recentWallpapers", "klonk.recentwallpapers", name)
   if name then hs.settings.set("klonk.wallpaper", name) else hs.settings.clear("klonk.wallpaper") end
   self:_applyWallpaper()
   if not keepSchedule then self:_restartWallpaperTimer() end
@@ -554,11 +607,241 @@ function obj:_setWallpaperSpeed(r)
   for _, w in ipairs(self._wpViews) do w:evaluateJavaScript(js) end
 end
 
+-- ===========================================================================
+-- Presenter mode — make an otherwise invisible demonstration legible. It uses
+-- the same observe-only event tap as Klonk's sounds, but its lifecycle is
+-- independent: muting audio must not blind the visual listener. Presenter mode
+-- is deliberately NOT persisted, so a Hammerspoon restart can never resume
+-- broadcasting keystrokes unexpectedly.
+-- ===========================================================================
+local PRESENTER_KEY_NAMES = {
+  [36] = "Return", [48] = "Tab", [49] = "Space", [51] = "Delete", [53] = "Esc",
+  [71] = "Clear", [76] = "Enter", [115] = "Home", [116] = "Page Up",
+  [117] = "Forward Delete", [119] = "End", [121] = "Page Down",
+  [123] = "←", [124] = "→", [125] = "↓", [126] = "↑",
+}
+local PRESENTER_MODIFIERS = {
+  { flag = "cmd", symbol = "⌘" },
+  { flag = "alt", symbol = "⌥" },
+  { flag = "ctrl", symbol = "⌃" },
+  { flag = "shift", symbol = "⇧" },
+  { flag = "fn", symbol = "fn" },
+  { flag = "capslock", symbol = "⇪" },
+}
+
+local function presenterModifierPrefix(flags)
+  local out = {}
+  for _, modifier in ipairs(PRESENTER_MODIFIERS) do
+    if flags[modifier.flag] then out[#out + 1] = modifier.symbol end
+  end
+  return table.concat(out, "+")
+end
+
+local function presenterKey(event)
+  local keyCode = event:getKeyCode()
+  local flags = event:getFlags()
+  local named = PRESENTER_KEY_NAMES[keyCode]
+  local characters = event:getCharacters(true)
+  local name = named
+  if not name and characters and characters ~= "" then name = characters end
+  if not name then name = hs.keycodes.map[keyCode] end
+  if not name or name == "" then
+    name = "Key " .. tostring(keyCode)
+  end
+  local prefix = presenterModifierPrefix(flags)
+  local label = prefix ~= "" and (prefix .. "+" .. name) or name
+  local shortcut = flags.cmd or flags.ctrl or flags.alt or flags.fn
+  local functionKey = type(name) == "string" and name:lower():match("^f%d+$") ~= nil
+  local special = shortcut or functionKey or (named ~= nil and keyCode ~= 49)
+  return label, special, name, prefix
+end
+
+function obj:_deletePresenterHUD()
+  if self._presenterRenderTimer then self._presenterRenderTimer:stop(); self._presenterRenderTimer = nil end
+  if self._presenterHUDTimer then self._presenterHUDTimer:stop(); self._presenterHUDTimer = nil end
+  if self._presenterHUD then self._presenterHUD:delete(); self._presenterHUD = nil end
+end
+
+function obj:_showPresenterKey(label, replaceLast)
+  local now = hs.timer.secondsSinceEpoch()
+  if now - self._presenterLastKey > PRESENTER_KEY_GAP then self._presenterKeys = {} end
+  self._presenterLastKey = now
+  if replaceLast and #self._presenterKeys > 0 then
+    table.remove(self._presenterKeys)
+  end
+  self._presenterKeys[#self._presenterKeys + 1] = label
+  while #self._presenterKeys > PRESENTER_KEY_LIMIT do table.remove(self._presenterKeys, 1) end
+
+  -- CGEventTap callbacks have a strict latency budget. Coalesce all text
+  -- measurement and canvas work onto the next run-loop tick so a burst of
+  -- physical keyDown events only mutates these small Lua tables synchronously.
+  if not self._presenterRenderTimer then
+    self._presenterRenderTimer = hs.timer.doAfter(0, function()
+      self._presenterRenderTimer = nil
+      self:_renderPresenterHUD()
+    end)
+  end
+end
+
+function obj:_renderPresenterHUD()
+  if self._presenterHUDTimer then self._presenterHUDTimer:stop(); self._presenterHUDTimer = nil end
+  local screen = hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
+  if not screen then return end
+  local sf = screen:frame()
+  local text = table.concat(self._presenterKeys, "   ")
+  local measured = hs.drawing.getTextDrawingSize(text, {
+    font = "SFMono-Semibold", size = 25,
+  })
+  local width = math.max(150, math.min((measured and measured.w or 420) + 48, 560, sf.w - 80))
+  local frame = {
+    x = sf.x + (sf.w - width) / 2,
+    y = sf.y + (sf.h - 64) / 2,
+    w = width, h = 64,
+  }
+  local canvas = self._presenterHUD
+  if canvas then canvas:frame(frame) else canvas = hs.canvas.new(frame) end
+  canvas[1] = {
+    type = "rectangle", action = "fill",
+    fillColor = { white = 0.05, alpha = 0.88 },
+    roundedRectRadii = { xRadius = 15, yRadius = 15 },
+    frame = { x = 0, y = 0, w = frame.w, h = frame.h },
+  }
+  canvas[2] = {
+    type = "text", text = text,
+    textAlignment = "center",
+    textColor = { white = 1, alpha = 1 },
+    textFont = "SFMono-Semibold", textSize = 25,
+    frame = { x = 18, y = 15, w = frame.w - 36, h = 38 },
+  }
+  canvas:level(hs.canvas.windowLevels.overlay)
+  canvas:behaviorAsLabels({ "canJoinAllSpaces", "stationary", "transient" })
+  canvas:show(0.08)
+  self._presenterHUD = canvas
+  self._presenterHUDTimer = hs.timer.doAfter(PRESENTER_KEY_GAP, function()
+    self:_deletePresenterHUD()
+    self._presenterKeys = {}
+  end)
+end
+
+function obj:_presenterKeyDown(event, isRepeat)
+  if isRepeat then return end
+  local label, special = presenterKey(event)
+  if self._presenterSpecialOnly and not special then return end
+  local replaceModifier = self._presenterModifierChord ~= nil
+    and self._presenterKeys[#self._presenterKeys] == self._presenterModifierChord
+  self:_showPresenterKey(label, replaceModifier)
+  if replaceModifier then self._presenterModifierChord = nil end
+end
+
+local function presenterModifierCount(flags)
+  local count = 0
+  for _, modifier in ipairs(PRESENTER_MODIFIERS) do
+    if flags[modifier.flag] then count = count + 1 end
+  end
+  return count
+end
+
+function obj:_presenterFlagsChanged(event)
+  local flags = event:getFlags()
+  local oldCount = presenterModifierCount(self._presenterFlags)
+  local newCount = presenterModifierCount(flags)
+  if newCount > oldCount then
+    local chord = presenterModifierPrefix(flags)
+    local replace = self._presenterModifierChord ~= nil
+      and self._presenterKeys[#self._presenterKeys] == self._presenterModifierChord
+    self:_showPresenterKey(chord, replace)
+    self._presenterModifierChord = chord
+  elseif newCount < oldCount then
+    -- A release closes this chord. A later modifier-down begins a new history
+    -- element instead of rewriting the chord that was already demonstrated.
+    self._presenterModifierChord = nil
+  end
+  self._presenterFlags = flags
+end
+
+function obj:_showPresenterClick(point, rightClick)
+  local size = 96
+  local canvas = hs.canvas.new({
+    x = point.x - size / 2, y = point.y - size / 2, w = size, h = size,
+  })
+  canvas[1] = {
+    type = "oval", action = "stroke",
+    strokeColor = { white = 0.35, alpha = 0.82 },
+    strokeWidth = 5,
+    frame = { x = 12, y = 12, w = size - 24, h = size - 24 },
+  }
+  if rightClick then
+    canvas[2] = {
+      type = "oval", action = "fill",
+      fillColor = { white = 0.35, alpha = 0.95 },
+      frame = { x = 64, y = 6, w = 26, h = 26 },
+    }
+    canvas[3] = {
+      type = "text", text = "R", textAlignment = "center",
+      textColor = { white = 1, alpha = 1 },
+      textFont = "Menlo-Bold", textSize = 14,
+      frame = { x = 64, y = 9, w = 26, h = 20 },
+    }
+  end
+  canvas:level(hs.canvas.windowLevels.overlay)
+  canvas:behaviorAsLabels({ "canJoinAllSpaces", "stationary", "transient" })
+  canvas:show()
+  canvas:hide(0.42)
+  local timer = hs.timer.doAfter(0.45, function()
+    if self._presenterRings[canvas] then
+      self._presenterRings[canvas] = nil
+      canvas:delete()
+    end
+  end)
+  self._presenterRings[canvas] = timer
+end
+
+function obj:_queuePresenterClick(point, rightClick)
+  local timer
+  timer = hs.timer.doAfter(0, function()
+    self._presenterClickQueue[timer] = nil
+    if self._presenter then self:_showPresenterClick(point, rightClick) end
+  end)
+  self._presenterClickQueue[timer] = true
+end
+
+function obj:_updatePresenterTapWatch()
+  if self._presenter and not self._presenterTapWatchTimer then
+    self._presenterTapWatchTimer = hs.timer.doEvery(0.25, function()
+      if self._presenter and self._tap and not self._tap:isEnabled() then
+        self._presenterTapRecoveries = self._presenterTapRecoveries + 1
+        hs.printf("klonk presenter: event tap disabled; recovery #%d",
+          self._presenterTapRecoveries)
+        self._tap:start()
+      end
+    end)
+  elseif not self._presenter and self._presenterTapWatchTimer then
+    self._presenterTapWatchTimer:stop()
+    self._presenterTapWatchTimer = nil
+  end
+end
+
+function obj:_tearDownPresenter()
+  self:_deletePresenterHUD()
+  self._presenterKeys = {}
+  self._presenterFlags = {}
+  self._presenterModifierChord = nil
+  for canvas, timer in pairs(self._presenterRings) do
+    timer:stop()
+    canvas:delete()
+  end
+  self._presenterRings = {}
+  for timer in pairs(self._presenterClickQueue) do timer:stop() end
+  self._presenterClickQueue = {}
+end
+
 function obj:_refresh()
   if self._menu then self._menu:setIcon(icon(not self._audioMuted and self._on)) end
   if self._tap then
-    if self._on and not self._audioMuted then self._tap:start() else self._tap:stop() end
+    local audioListening = self._on and not self._audioMuted
+    if audioListening or self._presenter then self._tap:start() else self._tap:stop() end
   end
+  self:_updatePresenterTapWatch()
   hs.settings.set("klonk.audiomuted", self._audioMuted)
   hs.settings.set("klonk.on", self._on)
   hs.settings.set("klonk.mouse", self._mouse)
@@ -568,10 +851,118 @@ function obj:_refresh()
   hs.settings.set("klonk.ambientvol", self._ambientVol)
 end
 
+local function pickerRows(names, current, titleFor, onPick)
+  local rows = {}
+  for _, name in ipairs(names) do
+    local selected = name
+    rows[#rows + 1] = {
+      title = titleFor and titleFor(selected) or selected,
+      checked = (selected == current),
+      fn = function() onPick(selected) end,
+    }
+  end
+  return rows
+end
+
+local function availableRecents(recent, available)
+  local rows = {}
+  for _, name in ipairs(recent or {}) do
+    if listContains(available, name) then rows[#rows + 1] = name end
+  end
+  return rows
+end
+
+local function clipTitle(name)
+  return name:gsub("^Aerial %- ", ""):gsub("%.%w+$", "")
+end
+
+function obj:_ambientSource(name)
+  local path = self:_ambientFile(name)
+  if not path then return "legacy" end
+  for i, dir in ipairs(self.ambientDirs or {}) do
+    local root = expand(dir) .. "/"
+    if path:sub(1, #root) == root then
+      if i == 1 then return "bundled" end
+      if i == 2 then return "personal" end
+      return "legacy"
+    end
+  end
+  return "legacy"
+end
+
+function obj:_studioScriptPath()
+  return hs.fs.pathToAbsolute(hs.spoons.resourcePath("../tools/studio.py"))
+end
+
+local function pythonPath()
+  for _, path in ipairs({
+    "/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3",
+  }) do
+    if hs.fs.attributes(path) then return path end
+  end
+end
+
+local function shellQuote(value)
+  return "'" .. value:gsub("'", "'\\''") .. "'"
+end
+
+-- Studio is the deliberate browse/audition surface; the menu remains the fast
+-- controller. Start its stdlib-only localhost server on demand and wait until it
+-- answers before opening the browser.
+function obj:_openStudio()
+  local url, health = "http://127.0.0.1:8801", "http://127.0.0.1:8801/api/state"
+  local function openWhenReady(attempt)
+    hs.http.asyncGet(health, nil, function(status)
+      if status == 200 then
+        hs.urlevent.openURL(url)
+      elseif attempt < 12 then
+        hs.timer.doAfter(0.2, function() openWhenReady(attempt + 1) end)
+      else
+        hs.alert.show("Klonk Studio did not start — see the Hammerspoon Console")
+      end
+    end)
+  end
+  hs.http.asyncGet(health, nil, function(status)
+    if status == 200 then hs.urlevent.openURL(url); return end
+    local script = self:_studioScriptPath()
+    if not script or not hs.fs.attributes(script) then
+      hs.alert.show("Klonk Studio is unavailable — tools/studio.py was not found")
+      return
+    end
+    local python = pythonPath()
+    if not python then
+      hs.alert.show("Klonk Studio needs Python 3")
+      return
+    end
+    self._studioLastError = nil
+
+    -- Clear a stale submitted job before creating the on-demand server. A
+    -- launchd-hosted process belongs to the GUI bootstrap session, so Studio's
+    -- hs CLI can call back into Hammerspoon; a direct hs.task child cannot.
+    hs.execute("/bin/launchctl remove " .. shellQuote(STUDIO_LABEL) .. " >/dev/null 2>&1")
+    local command = table.concat({
+      "/bin/launchctl submit -l", shellQuote(STUDIO_LABEL),
+      "-p", shellQuote(python),
+      "-o /tmp/klonk-studio.out -e /tmp/klonk-studio.err --",
+      shellQuote(python), shellQuote(script), "--port 8801",
+    }, " ")
+    local output, ok, reason, code = hs.execute(command)
+    self._studioLaunchTelemetry = {
+      ok = ok and true or false, reason = reason, code = code, output = output,
+    }
+    if not ok then
+      self._studioLastError = ("launchctl %s %s: %s"):format(
+        tostring(reason), tostring(code), output or "")
+      hs.printf("klonk studio launch failed: %s", self._studioLastError)
+      hs.alert.show("Klonk Studio could not be launched")
+      return
+    end
+    openWhenReady(1)
+  end)
+end
+
 function obj:_menuItems()
-  -- ---- Keyboard sounds ----------------------------------------------------
-  -- Action-verb labels: the row says what CLICKING does, not what the state is
-  -- (the state is already visible — the icon dims and slashes when muted).
+  -- ---- Shared volume controls ---------------------------------------------
   local vol = {}
   for _, v in ipairs(VOLUMES) do
     vol[#vol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
@@ -586,12 +977,33 @@ function obj:_menuItems()
         self:_refresh()
       end }
   end
-  local kb = {
-    { title = self._on and "Turn keyboard sounds off" or "Turn keyboard sounds on",
-      fn = function() self._on = not self._on; self:_refresh() end },
+
+  -- ---- Keyboard sounds ----------------------------------------------------
+  local sets, groupedSets = self:_sets(), {}
+  for _, s in ipairs(self:_sets()) do
+    local category = self:_category(s)
+    groupedSets[category] = groupedSets[category] or {}
+    groupedSets[category][#groupedSets[category] + 1] = s
+  end
+  local browseSets = {}
+  for _, category in ipairs(CATEGORIES) do
+    local names = groupedSets[category.key]
+    if names then
+      browseSets[#browseSets + 1] = {
+        title = category.label,
+        checked = listContains(names, self._set),
+        menu = pickerRows(names, self._set, nil, function(name)
+          self:_load(name); self:_refresh()
+        end),
+      }
+    end
+  end
+  local kbControls = {
     { title = self._mouse and "Turn mouse clicks off" or "Turn mouse clicks on",
       fn = function() self._mouse = not self._mouse; self:_refresh() end },
     { title = "Volume", menu = vol },
+  }
+  local kbLibrary = {
     { title = "Add sound sets…", fn = function()
       local d = expand("~/Music/Klonk/keyboard"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
     end },
@@ -600,30 +1012,23 @@ function obj:_menuItems()
     end },
     { title = "a set = folder of WAVs: down1..N, up1..N,", disabled = true, indent = 1 },
     { title = "space, enter, backspace; optional click, scroll", disabled = true, indent = 1 },
-    { title = "-" },
   }
-  -- Sets grouped by family, one submenu each. The checkmark on a family row
-  -- points at where the active set lives.
-  local groups = {}
-  for _, s in ipairs(self:_sets()) do
-    local c = self:_category(s)
-    groups[c] = groups[c] or {}
-    groups[c][#groups[c] + 1] = s
+  local kb = {
+    { title = "Current — " .. tostring(self._set), disabled = true },
+    { title = self._on and "Turn keyboard sounds off" or "Turn keyboard sounds on",
+      fn = function() self._on = not self._on; self:_refresh() end },
+  }
+  local recentSets = availableRecents(self._recentSets, sets)
+  if #recentSets > 0 then
+    kb[#kb + 1] = { title = "Recent", menu = pickerRows(recentSets, self._set, nil, function(name)
+      self:_load(name); self:_refresh()
+    end) }
   end
-  for _, cat in ipairs(CATEGORIES) do
-    local names = groups[cat.key]
-    if names then
-      local rows, active = {}, false
-      for _, s in ipairs(names) do
-        if s == self._set then active = true end
-        rows[#rows + 1] = { title = s, checked = (s == self._set),
-          fn = function() self:_load(s); self:_refresh() end }
-      end
-      kb[#kb + 1] = { title = cat.label, menu = rows, checked = active }
-    end
-  end
+  kb[#kb + 1] = { title = "Browse all", menu = browseSets }
+  kb[#kb + 1] = { title = "Controls", menu = kbControls }
+  kb[#kb + 1] = { title = "Library", menu = kbLibrary }
+
   -- ---- Ambient sounds -----------------------------------------------------
-  -- A looping background soundscape (rain, surf, hum) under the typing.
   local ambientVolumes = {}
   for _, v in ipairs(VOLUMES) do
     ambientVolumes[#ambientVolumes + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
@@ -634,22 +1039,52 @@ function obj:_menuItems()
         self:_refresh()
       end }
   end
+  local ambientNames = self:_ambientSounds()
+  local ambientGroups = { bundled = {}, personal = {}, legacy = {} }
+  for _, name in ipairs(ambientNames) do
+    local source = self:_ambientSource(name)
+    ambientGroups[source][#ambientGroups[source] + 1] = name
+  end
+  local browseAmbient = {}
+  for _, source in ipairs({
+    { key = "bundled", title = "Included with Klonk" },
+    { key = "personal", title = "My Library" },
+    { key = "legacy", title = "Legacy folders" },
+  }) do
+    local names = ambientGroups[source.key]
+    if #names > 0 then
+      browseAmbient[#browseAmbient + 1] = {
+        title = source.title,
+        checked = self._ambient and listContains(names, self._ambient) or false,
+        menu = pickerRows(names, self._ambient, nil, function(name)
+          self:_playAmbient(name); self:_refresh()
+        end),
+      }
+    end
+  end
   local amb = {
-    { title = "Turn ambient sounds off", checked = (self._ambient == nil),
+    { title = "Current — " .. (self._ambient or "Off"), disabled = true },
+    { title = "Off", checked = (self._ambient == nil),
       fn = function() self:_playAmbient(nil); self:_refresh() end },
-    { title = "Ambient sound volume", menu = ambientVolumes },
+  }
+  local recentAmbient = availableRecents(self._recentAmbient, ambientNames)
+  if #recentAmbient > 0 then
+    amb[#amb + 1] = { title = "Recent",
+      menu = pickerRows(recentAmbient, self._ambient, nil, function(name)
+        self:_playAmbient(name); self:_refresh()
+      end) }
+  end
+  amb[#amb + 1] = { title = "Browse all", menu = browseAmbient }
+  amb[#amb + 1] = { title = "Controls", menu = {
+    { title = "Volume", menu = ambientVolumes },
+  } }
+  amb[#amb + 1] = { title = "Library", menu = {
     { title = "Add ambient sounds…", fn = function()
       local d = expand("~/Music/Klonk/ambient"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
     end },
-    { title = "-" },
-  }
-  for _, ambient in ipairs(self:_ambientSounds()) do
-    amb[#amb + 1] = { title = ambient, checked = (ambient == self._ambient),
-      fn = function() self:_playAmbient(ambient); self:_refresh() end }
-  end
+  } }
 
   -- ---- Video desktop ------------------------------------------------------
-  -- Loop a scenic clip behind the icons: your own drops, or Apple Aerials.
   local spd = {}
   for _, option in ipairs(WP_SPEEDS) do
     local rate = option.rate
@@ -666,39 +1101,77 @@ function obj:_menuItems()
     }
   end
   local clips = self:_wallpapers()
-  local vid = {
-    { title = "Turn video desktop off", checked = (self._wp == nil),
-      fn = function() self:_setWallpaper(nil) end },
-    { title = "Speed", menu = spd, checked = (self._wpSpeed ~= 1.0) },
-    { title = "Change desktop", menu = cadence, checked = (self._wpChangeMinutes > 0) },
-    { title = "Shuffle now", disabled = (#clips == 0), fn = function() self:_shuffleWallpaper() end },
-    { title = "Pause on battery", checked = self._wpPauseBattery,
-    fn = function()
-      self._wpPauseBattery = not self._wpPauseBattery
-      hs.settings.set("klonk.wppausebattery", self._wpPauseBattery)
-      self:_applyWallpaper()
-    end }
-  }
-  vid[#vid + 1] = { title = "Sync Apple aerials now", fn = function()
-    local n = self:_syncAerials()
-    hs.alert.show(n > 0
-      and ("Linked " .. n .. " Apple aerial" .. (n == 1 and "" or "s") .. " — reopen this menu")
-      or  "No aerials downloaded — add them in System Settings ▸ Wallpaper, then sync")
-  end }
-  vid[#vid + 1] = { title = "Add your own clips…", fn = function()
-    local d = self:_wpDir(); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
-  end }
-  vid[#vid + 1] = { title = "-" }
-  if #clips == 0 then
-    vid[#vid + 1] = { title = "No clips yet — add .mp4/.mov, or sync aerials above", disabled = true }
-  else
-    for _, name in ipairs(clips) do
-      vid[#vid + 1] = { title = name:gsub("%.%w+$", ""), checked = (self._wp == name),
-        fn = function() self:_setWallpaper(name) end }
+  local videoGroups = { aerials = {}, personal = {} }
+  for _, name in ipairs(clips) do
+    local group = name:match("^Aerial %- ") and "aerials" or "personal"
+    videoGroups[group][#videoGroups[group] + 1] = name
+  end
+  local browseVideo = {}
+  for _, source in ipairs({
+    { key = "aerials", title = "Apple Aerials" },
+    { key = "personal", title = "My Clips" },
+  }) do
+    local names = videoGroups[source.key]
+    if #names > 0 then
+      browseVideo[#browseVideo + 1] = {
+        title = source.title,
+        checked = self._wp and listContains(names, self._wp) or false,
+        menu = pickerRows(names, self._wp, clipTitle, function(name) self:_setWallpaper(name) end),
+      }
     end
   end
+  local vid = {
+    { title = "Current — " .. (self._wp and clipTitle(self._wp) or "Off"), disabled = true },
+    { title = "Off", checked = (self._wp == nil),
+      fn = function() self:_setWallpaper(nil) end },
+    { title = "Shuffle now", disabled = (#clips == 0), fn = function() self:_shuffleWallpaper() end },
+  }
+  local recentVideos = availableRecents(self._recentWallpapers, clips)
+  if #recentVideos > 0 then
+    vid[#vid + 1] = { title = "Recent",
+      menu = pickerRows(recentVideos, self._wp, clipTitle, function(name) self:_setWallpaper(name) end) }
+  end
+  vid[#vid + 1] = { title = "Browse all", disabled = (#clips == 0), menu = browseVideo }
+  vid[#vid + 1] = { title = "Playback", menu = {
+    { title = "Speed", menu = spd, checked = (self._wpSpeed ~= 1.0) },
+    { title = "Change desktop", menu = cadence, checked = (self._wpChangeMinutes > 0) },
+    { title = "Pause on battery", checked = self._wpPauseBattery,
+      fn = function()
+        self._wpPauseBattery = not self._wpPauseBattery
+        hs.settings.set("klonk.wppausebattery", self._wpPauseBattery)
+        self:_applyWallpaper()
+      end },
+  } }
+  local videoLibrary = {
+    { title = "Sync Apple aerials now", fn = function()
+      local n = self:_syncAerials()
+      hs.alert.show(n > 0
+        and ("Linked " .. n .. " Apple aerial" .. (n == 1 and "" or "s") .. " — reopen this menu")
+        or  "No aerials downloaded — add them in System Settings ▸ Wallpaper, then sync")
+    end },
+    { title = "Add your own clips…", fn = function()
+      local d = self:_wpDir(); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
+    end },
+  }
+  if #clips == 0 then
+    videoLibrary[#videoLibrary + 1] = {
+      title = "No clips yet — add .mp4/.mov, or sync aerials above", disabled = true
+    }
+  end
+  vid[#vid + 1] = { title = "Library", menu = videoLibrary }
 
-  -- ---- Top level: three groups, active state shown by a group checkmark ----
+  local presenter = {
+    { title = self._presenter and "Stop" or "Start",
+      fn = function() self:togglePresenter() end },
+    { title = "Keys shown", menu = {
+      { title = "All keys", checked = not self._presenterSpecialOnly,
+        fn = function() self:_setPresenterSpecialOnly(false) end },
+      { title = "Special keys only", checked = self._presenterSpecialOnly,
+        fn = function() self:_setPresenterSpecialOnly(true) end },
+    } },
+  }
+
+  -- ---- Top level: experience groups and session utilities ------------------
   return {
     { title = hs.styledtext.new("klonk", { font = { name = "Menlo-Bold", size = 11 },
         color = { white = 0.5 } }), disabled = true },
@@ -709,6 +1182,9 @@ function obj:_menuItems()
     { title = "Keyboard sounds", menu = kb,  checked = self._on },
     { title = "Ambient sounds",  menu = amb, checked = (self._ambient ~= nil) },
     { title = "Video desktop",   menu = vid, checked = (self._wp ~= nil) },
+    { title = "-" },
+    { title = "Presenter mode", menu = presenter, checked = self._presenter },
+    { title = "Open Klonk Studio…", fn = function() self:_openStudio() end },
   }
 end
 
@@ -734,6 +1210,28 @@ end
 --- Toggles mouse-click and scroll sounds on/off, independent of keystrokes.
 function obj:toggleMouse()
   self._mouse = not self._mouse; self:_refresh(); return self
+end
+
+--- Klonk:togglePresenter()
+--- Method
+--- Toggles the session-only keystroke HUD and click highlights.
+function obj:togglePresenter()
+  self._presenter = not self._presenter
+  if not self._presenter then self:_tearDownPresenter() end
+  self:_refresh()
+  if self._presenter and hs.eventtap.isSecureInputEnabled() then
+    hs.alert.show("Presenter mode on — secure input is active, so keys may stay hidden")
+  else
+    hs.alert.show("Presenter mode " .. (self._presenter and "on" or "off"), 0.8)
+  end
+  return self
+end
+
+function obj:_setPresenterSpecialOnly(specialOnly)
+  self._presenterSpecialOnly = specialOnly
+  hs.settings.set("klonk.presenterspecialonly", specialOnly)
+  self:_deletePresenterHUD()
+  self._presenterKeys = {}
 end
 
 --- Klonk:cycleSet(step)
@@ -775,12 +1273,17 @@ function obj:start()
   self._on = hs.settings.get("klonk.on"); if self._on == nil then self._on = true end
   self._mouse = hs.settings.get("klonk.mouse"); if self._mouse == nil then self._mouse = true end
   self._vol = hs.settings.get("klonk.vol") or 0.7
+  self._recentSets = settingsList("klonk.recentsets")
+  self._recentAmbient = settingsList("klonk.recentambient")
+  self._recentWallpapers = settingsList("klonk.recentwallpapers")
   local savedSet = hs.settings.get("klonk.set")
   local selected = SET_ALIASES[savedSet] or savedSet
   self._set = selected and self:_setDir(selected) and selected or (self:_sets()[1] or "thock")
   -- Read the pre-2.2 keys once so existing selections survive the terminology
   -- migration; all subsequent writes use the new ambient keys above.
   self._ambientVol = hs.settings.get("klonk.ambientvol") or hs.settings.get("klonk.bedvol") or 0.5
+  self._presenter = false
+  self._presenterSpecialOnly = hs.settings.get("klonk.presenterspecialonly") or false
 
   local et = hs.eventtap.event.types
   local props = hs.eventtap.event.properties
@@ -800,26 +1303,52 @@ function obj:start()
     end
   end
 
+  -- Never perform NSSound stop/play inside the CGEventTap callback: that
+  -- callback gates delivery to the foreground app. Queue compact pool chains
+  -- and drain them on the next run-loop turn instead.
+  local function queuePlay(...)
+    if #self._audioQueue >= AUDIO_QUEUE_LIMIT then
+      table.remove(self._audioQueue, 1)
+      self._audioQueueDrops = self._audioQueueDrops + 1
+    end
+    self._audioQueue[#self._audioQueue + 1] = { ... }
+    if not self._audioDrainTimer then
+      self._audioDrainTimer = hs.timer.doAfter(0, function()
+        self._audioDrainTimer = nil
+        local pending = self._audioQueue
+        self._audioQueue = {}
+        for _, chain in ipairs(pending) do play(table.unpack(chain)) end
+      end)
+    end
+  end
+
   self._tap = hs.eventtap.new({
-    et.keyDown, et.keyUp,
+    et.keyDown, et.keyUp, et.flagsChanged,
     et.leftMouseDown,  et.leftMouseUp,
     et.rightMouseDown, et.rightMouseUp,
     et.scrollWheel,
   }, function(e)
+    local callbackStarted = hs.timer.secondsSinceEpoch()
     local p, t = self._pool, e:getType()
+    local audioListening = self._on and not self._audioMuted
+
     if t == et.keyDown then
-      play(p[e:getKeyCode()], p.down)
+      local isRepeat = e:getProperty(props.keyboardEventAutorepeat) == 1
+      if self._presenter then self:_presenterKeyDown(e, isRepeat) end
+      if audioListening then queuePlay(p[e:getKeyCode()], p.down) end
     elseif t == et.keyUp then
-      play(p.up)
-    elseif not self._mouse then
-      return false                       -- mouse sounds disabled
+      if audioListening then queuePlay(p.up) end
+    elseif t == et.flagsChanged then
+      if self._presenter then self:_presenterFlagsChanged(e) end
     elseif t == et.leftMouseDown then
-      play(p.click, p.down)
+      if self._presenter then self:_queuePresenterClick(e:location(), false) end
+      if audioListening and self._mouse then queuePlay(p.click, p.down) end
     elseif t == et.rightMouseDown then
-      play(p.rightclick, p.click, p.down)
+      if self._presenter then self:_queuePresenterClick(e:location(), true) end
+      if audioListening and self._mouse then queuePlay(p.rightclick, p.click, p.down) end
     elseif t == et.leftMouseUp or t == et.rightMouseUp then
-      play(p.clickup, p.up)
-    elseif t == et.scrollWheel then
+      if audioListening and self._mouse then queuePlay(p.clickup, p.up) end
+    elseif t == et.scrollWheel and audioListening and self._mouse then
       -- Tick on wheel notches and active trackpad scroll, but stay SILENT during
       -- inertial "momentum" coasting (phase ~= 0). Throttle so a fast two-finger
       -- swipe is a gentle tick-tick, not a roar.
@@ -827,10 +1356,13 @@ function obj:start()
         local now = hs.timer.secondsSinceEpoch()
         if now - self._lastScroll >= SCROLL_GAP then
           self._lastScroll = now
-          play(p.scroll, p.up)
+          queuePlay(p.scroll, p.up)
         end
       end
     end
+    local elapsed = hs.timer.secondsSinceEpoch() - callbackStarted
+    self._eventTapEvents = self._eventTapEvents + 1
+    if elapsed > self._eventTapMaxSeconds then self._eventTapMaxSeconds = elapsed end
     return false        -- observe only; never swallow the event
   end)
 
@@ -845,6 +1377,7 @@ function obj:start()
   self._wpSpeed = hs.settings.get("klonk.wpspeed") or 1.0
   self._wpChangeMinutes = hs.settings.get("klonk.wpchangeminutes") or 0
   self._wp = hs.settings.get("klonk.wallpaper")
+  self:_rememberRecent("_recentWallpapers", "klonk.recentwallpapers", self._wp)
   self:_syncAerials()
   self._wpScreen = self._wpScreen or hs.screen.watcher.new(function() self:_applyWallpaper() end):start()
   self._wpBattery = self._wpBattery or hs.battery.watcher.new(function()
@@ -862,10 +1395,19 @@ end
 --- Removes the menu-bar item and stops listening.
 function obj:stop()
   if self._tap then self._tap:stop(); self._tap = nil end
+  if self._audioDrainTimer then self._audioDrainTimer:stop(); self._audioDrainTimer = nil end
+  self._audioQueue = {}
+  self._presenter = false
+  self:_tearDownPresenter()
+  if self._presenterTapWatchTimer then
+    self._presenterTapWatchTimer:stop()
+    self._presenterTapWatchTimer = nil
+  end
   if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
   if self._wpChangeTimer then self._wpChangeTimer:stop(); self._wpChangeTimer = nil end
   self._wpApplyGeneration = self._wpApplyGeneration + 1
   if self._wpFadeTimer then self._wpFadeTimer:stop(); self._wpFadeTimer = nil end
+  hs.execute("/bin/launchctl remove " .. STUDIO_LABEL)
   self:_tearDownWallpaper()
   if self._wpScreen then self._wpScreen:stop(); self._wpScreen = nil end
   if self._wpBattery then self._wpBattery:stop(); self._wpBattery = nil end
@@ -875,12 +1417,14 @@ end
 
 --- Klonk:bindHotkeys(mapping)
 --- Method
---- Binds hotkeys. Keys: `toggle`, `toggleMouse`, `nextSet`, `prevSet`. Example:
+--- Binds hotkeys. Keys: `toggle`, `toggleMouse`, `togglePresenter`, `nextSet`,
+--- `prevSet`. Example:
 --- `spoon.Klonk:bindHotkeys({ toggle = {{"cmd","alt"}, "k"} })`
 function obj:bindHotkeys(mapping)
   hs.spoons.bindHotkeysToSpec({
     toggle      = function() self:toggle() end,
     toggleMouse = function() self:toggleMouse() end,
+    togglePresenter = function() self:togglePresenter() end,
     nextSet     = function() self:cycleSet(1) end,
     prevSet     = function() self:cycleSet(-1) end,
   }, mapping)
