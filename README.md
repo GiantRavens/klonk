@@ -1,7 +1,7 @@
 # ⌨ klonk
 
-**Desktop ambiance for macOS — mechanical keystroke sounds, ambient soundscapes,
-a live video ON YOUR DESKTOP, and a presenter mode that makes input visible.**
+**Desktop ambiance for macOS based on Hammerspoon utility — mechanical keystroke sounds, ambient soundscapes,
+a live video ON YOUR DESKTOP, and a presenter mode that makes keyboard and mouse clicks visible.**
 
 klonk is a Hammerspoon menu-bar item with one icon and three groups, each covering different aspects of how you want to curate your Mac's working environment. Want cool keyboard sounds? Weird keyboard sounds? How about an ambient soundtrack of the beach, city life, or favorite sci-fi while you work. And how about we paint a moving desktop on your screen that simply taps into the existing Apple screensaver videos.
 
