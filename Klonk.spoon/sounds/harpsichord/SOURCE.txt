@@ -1,0 +1,10 @@
+Set 'harpsichord' built by tools/instruments.py.
+
+Synthesized: a physical model of a two-manual harpsichord (8' back, 8' front, 4')
+after Valimaki, Penttinen, Laurson, Erkut, and Knif, "Model-based sound synthesis of
+the harpsichord", Joint Baltic-Nordic Acoustics Meeting 2004: per-key loop gain and
+loss filter (eqs. 3-4), 12%-50% plucking point, 8-branch soundboard network (Table 1)
+behind a 350 Hz high-pass, and a damper release on key-up. Tuned to A4 = 415 Hz.
+No samples.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=harpsichord

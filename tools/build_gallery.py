@@ -54,8 +54,7 @@ if os.path.isdir(AMBIENT_DIR):
 
 # rough per-family labels for the chips
 FAMILY = {
-    "thock": "synth · deep", "crystal": "synth · glass tings",
-    "telegraph": "recorded · sounder", "console": "synth · 8-bit",
+    "thock": "synth · deep", "telegraph": "recorded · sounder",
     "ping-pong": "recorded · sports", "tennis": "recorded · sports",
     "blues": "recorded · Cherry MX Blue", "browns": "recorded · Cherry MX Brown",
     "pandas": "recorded · Holy Panda",
@@ -70,7 +69,11 @@ FAMILY = {
     "eg-oreo": "recorded · Everglide Oreo",
     "topre-purple-hybrid-pbt": "recorded · Topre Purple Hybrid / PBT",
     "vibraphone": "musical · pentatonic", "kalimba": "musical · pentatonic",
-    "harpsichord": "musical · pentatonic", "jazzy": "musical · pentatonic",
+    "harpsichord": "musical · physical model", "jazz-piano": "musical · sampled upright",
+    "schmoove-guitar": "musical · plucked strings",
+    "wurlitzer": "musical · sampled Wurlitzer 200A", "hard-drive-music-box": "musical · sampled music box",
+    "bagpipe": "musical · sampled bagpipe + drones",
+    "gregorian": "musical · chant + organum drone", "slap-bass": "musical · funk slap bass",
 }
 
 payload = json.dumps(sets)

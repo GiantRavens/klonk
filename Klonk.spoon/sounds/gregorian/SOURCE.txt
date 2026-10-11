@@ -1,0 +1,11 @@
+Set 'gregorian' built by tools/instruments.py.
+
+Gregorian chant: choir voices singing D dorian (the first mode) in a cathedral
+reverb. sustain.wav holds an organum drone, low D and A in fifths, from the first key
+until Return, which sings a falling melisma to an Amen on the final. Neumes on Space,
+Backspace, and one key.
+Rendered with FluidSynth from GeneralUser GS v2.0.3 by S. Christian Collins
+(github.com/mrbumpy409/GeneralUser-GS, commit 684543d5e5), which its license
+allows in software projects, private or commercial.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=gregorian

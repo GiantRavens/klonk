@@ -1,0 +1,13 @@
+Set 'orchestra-build' is performed, not sampled per key: Klonk forwards your typing to
+performer/orchestra.html, a live Web Audio page.
+
+A sentence builds and Return lands it. Each keystroke plucks a pizzicato note of the
+current chord over a string pad; the harmony walks D minor, B-flat, F, C, D minor,
+B-flat, G minor and holds on A, the dominant. Cellos, horns, then brass join as the
+sentence grows, and at full strength each keystroke is a timpani stroke. Holding keys
+swells the orchestra; a comma breathes; Backspace steps back a chord. A period or Return
+lands the cadence with the full orchestra, timpani, bass drum and crash: in D major if
+you built to the dominant, D minor otherwise. Stop typing and it fades by itself.
+
+Notes rendered by tools/build_orchestra.py with FluidSynth from GeneralUser GS v2.0.3
+by S. Christian Collins, whose license permits use in software projects.

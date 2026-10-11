@@ -1,0 +1,11 @@
+Set 'wurlitzer' built by tools/instruments.py.
+
+Sampled: the Open Samples 'Wurlitzer 200A Electric Piano' raw reed recordings at four
+dynamics (pp, mp, f, ff). Keys play the mellow mp takes in C minor pentatonic; Space is
+a rootless Cm9; Return barks a hard-hit Bb13 into Cm9; clicks are low reeds. Key-up is
+a synthesized key thump.
+Recorded samples from Open Samples (github.com/pumodi/open-samples, commit a7eab67887), Jeffrey Brice and contributors, under the Open Samples
+Permissive Use Public License v2: royalty free for sound playback; not to be resold or
+repackaged for sale. Klonk is free and redistributes these derived sounds non-commercially.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=wurlitzer

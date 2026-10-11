@@ -1,0 +1,10 @@
+Set 'hard-drive-music-box' built by tools/instruments.py.
+
+Sampled: the Open Samples 'Hard Drive Music Box', a paper-tape music box gaffer-taped
+to an empty hard drive case, recorded in G#/Ab major with two takes per note; both
+takes are used. Return rolls an Ab major arpeggio. Played as recorded, not repitched.
+Recorded samples from Open Samples (github.com/pumodi/open-samples, commit a7eab67887), Jeffrey Brice and contributors, under the Open Samples
+Permissive Use Public License v2: royalty free for sound playback; not to be resold or
+repackaged for sale. Klonk is free and redistributes these derived sounds non-commercially.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=hard-drive-music-box

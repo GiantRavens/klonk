@@ -1,0 +1,9 @@
+Set 'bagpipe' built by tools/instruments.py.
+
+Sampled: FreePats 'Bagpipe in G' (github.com/freepats/bagpipe, commit 496f2f6e82), recorded
+August 2020 by Gilles Sadowski on a bagpipe designed by Remy Dubois and built by Olle
+Geris. sustain.wav loops both drones (G2, G3): the first key or click starts them,
+they hold under every note, and Return ends them with a run to a held high G.
+Chanter notes open with a high-G gracenote; Backspace is a birl. CC0 public domain.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=bagpipe

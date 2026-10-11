@@ -9,11 +9,17 @@ A set = a folder of WAVs. The engine's filename convention:
   clickup.wav    mouse-up release
   rightclick.wav secondary-click (a touch deeper than click)
   scroll1..N.wav wheel / trackpad-scroll detent tick (short + quiet)
+  sustain.wav    optional loop held from the first input until Return (bagpipe drones)
 
 Mouse voices are OPTIONAL — the engine falls back click->down, scroll->up — but
 every built-in set ships them so the mouse feels purpose-made, not borrowed.
 Regenerate just the mouse files (leaving landed key sounds untouched) with:
   python3 tools/generate.py Klonk.spoon/sounds --mouse
+Render only some sets (no other set is touched or re-randomized) with:
+  python3 tools/generate.py Klonk.spoon/sounds --only=harpsichord,jazz-piano
+Build the personal star-voyage set (keeps its recorded enter.wav; reads the
+recorded console effects from the LCARS backup) with:
+  python3 tools/generate.py --star-voyage=~/Music/Klonk/keyboard/star-voyage
 
 Each sound is synthesized as: a filtered noise burst (the "contact") plus a few
 exponentially-decaying sine partials (the "body resonance"). Variants detune
@@ -72,17 +78,6 @@ SETS = {
         "rightclick": (0.12, (1.0, 520, 0.022),  [(105, .72, .055), (160, .4, .035)], 1.05),                # deeper
         "scroll":     (0.03, (0.5, 1200, 0.004), [(300, .15, .006)], 0.30),                                 # tiny detent
     },
-    "crystal": {  # bright glass/crystal tings — precise, resonant, jewel-like
-        "down":      (0.06, (0.7, 5500, 0.008), [(2300, .45, .018), (3600, .3, .012), (1200, .2, .02)], 0.9),
-        "up":        (0.04, (0.5, 6500, 0.005), [(3000, .25, .01)], 0.35),
-        "space":     (0.08, (0.8, 3500, 0.012), [(1700, .5, .02), (900, .3, .025)], 1.0),
-        "enter":     (0.07, (0.8, 4500, 0.010), [(2000, .5, .02), (3100, .25, .012)], 1.0),
-        "backspace": (0.06, (0.7, 6000, 0.007), [(2600, .4, .015), (4000, .25, .01)], 0.85),
-        "click":      (0.07,  (0.8, 5000, 0.009), [(2000, .45, .02), (3200, .3, .013), (1000, .22, .022)], 0.95),
-        "clickup":    (0.04,  (0.5, 6500, 0.005), [(2800, .25, .01)], 0.35),
-        "rightclick": (0.08,  (0.85, 4200, 0.011),[(1700, .5, .022), (2700, .28, .014)], 0.95),
-        "scroll":     (0.025, (0.6, 7000, 0.004), [(4000, .18, .005)], 0.30),
-    },
 }
 # click/scroll get randomized variants (they repeat a lot); clickup/rightclick
 # render once. MOUSE_KEYS drives the additive `--mouse` regen.
@@ -94,7 +89,6 @@ MOUSE_KEYS = {"click", "clickup", "rightclick", "scroll"}
 # the set's enter is already its own flourish (tonal / music).
 DINGS = {
     "thock":      (523, 1.10, 0.45),   # soft low bell — matches the creamy body
-    "crystal":    (880, 0.90, 0.45),   # bright crystal flourish
 }
 
 # --- OUR ding: a struck service bell -----------------------------------------
@@ -237,18 +231,7 @@ def kalimba(f, dur=0.45, level=0.6):
     return _instr(f, dur, [(1, 1.0, dur*0.8), (2.76, 0.45, dur*0.4), (5.40, 0.22, dur*0.2)],
                   level, pluck=0.25)
 
-def harpsichord(f, dur=0.5, level=0.55):
-    # plucked string: full harmonic stack, bright, quick decay, hard pluck
-    return _instr(f, dur, [(h, 1.0/h, dur*0.4) for h in range(1, 10)],
-                  level, pluck=0.35, td=0.01)
-
-def jazzy(f, dur=0.6, level=0.55):
-    # Rhodes-ish: fundamental + a struck 'bell' overtone that fades fast = e-piano
-    return _instr(f, dur, [(1, 1.0, dur*0.6), (2, 0.3, dur*0.4), (14, 0.18, 0.05)],
-                  level, td=0.02)
-
-INSTRUMENTS = {"vibraphone": vibraphone, "kalimba": kalimba,
-               "harpsichord": harpsichord, "jazzy": jazzy}
+INSTRUMENTS = {"vibraphone": vibraphone, "kalimba": kalimba}
 
 def gliss(inst, freqs, step=0.05, notedur=0.35, level=0.65):
     """Overlap-add a run up the scale — the harpsichord-style Enter flourish."""
@@ -265,7 +248,10 @@ def render_musical(base, only=None):
     for name, inst in INSTRUMENTS.items():
         d = os.path.join(base, name)
         os.makedirs(d, exist_ok=True)
-        tag(d, "musical")
+        tag(d, "interactive")
+        with open(os.path.join(d, "SOURCE.txt"), "w") as f:
+            f.write(f"Set '{name}' synthesized by tools/generate.py (sine-partial recipe, C minor "
+                    "pentatonic).\nNo samples. Released CC0.\n")
         if want("down"):   # down variants ARE the scale — random pick improvises
             for i, off in enumerate(SCALE, start=1):
                 write_wav(os.path.join(d, f"down{i}.wav"), inst(midi(off)))
@@ -298,33 +284,9 @@ def render_musical(base, only=None):
 # --- MECHANICAL sets: rendered by synth_mech, not the sine-stack synth --------
 # Each key is synth_mech kwargs. An optional "ding" bakes a bell into enter;
 # Return behavior is an artistic choice per set, not a global convention.
-MECH = {
-    # Telegraph is a curated recorded set and is deliberately not regenerated.
-    "console": {   # old-school console: chunky 8-bit-flavored beeps and bops
-        "ding": None,  # Return keeps its drum-pad action without a bell overlay
-        "keys": {
-            "down":      dict(dur=0.16, thump=(190,120,0.9,0.050), impact=(1.0,2400,0.007),
-                              ring=[(520,.4,.05),(1100,.3,.03),(1900,.16,.02)],
-                              strike2=(0.008,0.5), sat=2.8, level=0.80),   # slap+hammer
-            "up":        dict(dur=0.05, thump=(410,300,0.4,0.020), impact=(0.6,3500,0.005),
-                              ring=[(1400,.25,.012)], sat=2.0, level=0.40),
-            "space":     dict(dur=0.22, thump=(150,92,1.1,0.090), impact=(1.0,1800,0.008),
-                              ring=[(300,.4,.06),(95,.5,.10)], sat=2.8, level=0.92),   # platen thunk
-            "enter":     dict(dur=0.16, thump=(190,120,0.9,0.050), impact=(0.95,2400,0.007),
-                              ring=[(520,.35,.05),(1100,.25,.03)], strike2=(0.008,0.5), sat=2.8, level=0.80),
-            "backspace": dict(dur=0.13, thump=(240,150,0.8,0.040), impact=(0.9,2800,0.006),
-                              ring=[(700,.4,.04),(1500,.2,.02)], sat=2.6, level=0.72),
-            "click":      dict(dur=0.16, thump=(185,118,0.9,0.05), impact=(1.0,2300,0.007),
-                               ring=[(500,.4,.05),(1050,.3,.03)], strike2=(0.008,0.5), sat=2.8, level=0.82),  # slap+hammer
-            "clickup":    dict(dur=0.05, thump=(400,290,0.4,0.02), impact=(0.6,3500,0.005),
-                               ring=[(1350,.25,.012)], sat=2.0, level=0.4),
-            "rightclick": dict(dur=0.17, thump=(170,108,0.95,0.055), impact=(1.0,2100,0.008),
-                               ring=[(460,.4,.055),(980,.25,.03)], strike2=(0.009,0.5), sat=2.8, level=0.82),
-            "scroll":     dict(dur=0.05, thump=(520,400,0.35,0.015), impact=(0.6,3800,0.004),
-                               ring=[(1500,.22,.01)], sat=2.0, level=0.4),
-        },
-    },
-}
+# Console and Crystal retired 2026-10-10. Telegraph is a curated recorded set and
+# is deliberately not regenerated. The table stays for future synthesized machines.
+MECH = {}
 
 def render_mech(base, only=None):
     for set_name, spec in MECH.items():
@@ -416,6 +378,25 @@ def render_ambient(base):
 def main():
     flags = sys.argv[1:]
     args = [a for a in flags if not a.startswith("-")]
+    opts = dict(f[2:].split("=", 1) for f in flags if f.startswith("--") and "=" in f)
+    if "star-voyage" in opts:                            # build the personal star-voyage set in place
+        import instruments
+        d = os.path.abspath(os.path.expanduser(opts["star-voyage"]))
+        instruments.render_star_voyage(d, os.path.join(os.path.dirname(d), ".lcars-frenetic-backup"))
+        return
+    if "only" in opts:                                   # render just the named sets
+        import instruments
+        base = os.path.abspath(args[0]) if args else os.path.dirname(os.path.abspath(__file__))
+        names = opts["only"].split(",")
+        for name in names:
+            if name in instruments.MODELS:
+                instruments.render_model(base, name)
+            elif name in INSTRUMENTS:
+                saved = dict(INSTRUMENTS); INSTRUMENTS.clear(); INSTRUMENTS[name] = saved[name]
+                render_musical(base); INSTRUMENTS.update(saved)
+            else:
+                sys.exit(f"unknown set for --only: {name}")
+        return
     only = MOUSE_KEYS if "--mouse" in flags else None          # additive: only touch mouse files
     ambient_only = "--ambient" in flags                  # additive: only rebuild ambient sounds
     base = os.path.abspath(args[0]) if args \
@@ -429,7 +410,7 @@ def main():
     for set_name, keys in SETS.items():
         d = os.path.join(base, set_name)
         os.makedirs(d, exist_ok=True)
-        tag(d, "mechanical")
+        tag(d, "themed")
         for key, (dur, noise, partials, gain) in keys.items():
             if only and key not in only: continue
             for v in range(1, VARIANTS.get(key, 1) + 1):
@@ -445,6 +426,9 @@ def main():
         print(f"  {set_name}: {len(os.listdir(d))} files")
     render_mech(base, only)
     render_musical(base, only)
+    if not only:
+        import instruments
+        for name in instruments.MODELS: instruments.render_model(base, name)
     if not only:
         render_ambient(base)
         print("  (Return flourishes are defined independently by each set)")

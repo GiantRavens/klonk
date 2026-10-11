@@ -16,8 +16,8 @@
 --- dedicated `click` / `clickup` / `rightclick` / `scroll` WAVs to voice the
 --- mouse on its own.
 ---
---- The menu-bar shows a keyboard icon (dims + slashes when muted). Click it to
---- toggle sound, toggle mouse clicks, pick a set, or set the volume. Sets are
+--- The menu bar shows a keyboard icon (dims when muted). Open Settings for
+--- sound choices, volumes, and desktop controls. Sets are
 --- scanned from the bundled `sounds/` folder plus `~/Music/Klonk/keyboard`.
 ---
 --- Download: https://github.com/giantravens/klonk
@@ -26,7 +26,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "Klonk"
-obj.version = "2.4"
+obj.version = "2.5"
 obj.author = "Skip Levens"
 obj.homepage = "https://github.com/giantravens/klonk"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
@@ -61,7 +61,8 @@ obj.ambientDirs = nil
 --- Variable
 --- List of directories scanned for video-desktop clips — `.mp4/.mov/.m4v` files
 --- that loop behind the desktop icons. Both work: drop your OWN clips in, or let
---- `_syncAerials()` symlink Apple's downloaded Aerials in for free. Defaults to
+--- `_syncAerials()` symlink Apple's downloaded Aerials in for free, or download a
+--- whole Aerial collection (Settings ▸ Tools). Defaults to
 --- `~/Music/Klonk/livedesktop`. Each file's basename (minus extension) is a
 --- pick's menu name. Set before `:start()`.
 obj.wallpaperDirs = nil
@@ -72,7 +73,11 @@ obj._tap   = nil
 obj._pool  = {}
 obj._set   = nil
 obj._on    = true
-obj._mouse = true
+obj._keys  = true -- keystroke sounds (the card switch gates keys, clicks, and scroll)
+obj._mouse = true -- click sounds
+obj._clickSet = nil -- set that voices clicks and scroll; nil = same as keys
+obj._mousePool = nil -- that set's pools when it differs from the key set
+obj._scroll = true
 obj._vol   = 0.7
 obj._lastScroll = 0
 obj._ambient      = nil -- current ambient sound name (nil = none)
@@ -102,8 +107,8 @@ obj._presenterFlags = {}
 obj._presenterModifierChord = nil
 obj._presenterRings = {}
 obj._presenterClickQueue = {}
-obj._presenterTapWatchTimer = nil
-obj._presenterTapRecoveries = 0
+obj._tapWatchTimer = nil
+obj._tapRecoveries = 0 -- times the watchdog re-enabled a tap macOS had disabled
 obj._eventTapMaxSeconds = 0
 obj._eventTapEvents = 0
 obj._audioQueue = {}
@@ -118,22 +123,89 @@ local KEYFILE = { [49] = "space", [36] = "enter", [51] = "backspace" }
 -- (see the play() chains in :start()), so a set needs zero new files to click.
 local GENERIC = { up = true, down = true, click = true, clickup = true,
                   rightclick = true, scroll = true }
-local VOLUMES = { 0.3, 0.5, 0.7, 1.0 }
-local SET_ALIASES = { clicky = "crystal", manual = "console",
-                      paper = "calligraph", water = "splash" }
+-- Renamed sets keep saved selections and recents. Retired sets (console,
+-- crystal) have no successor and fall back to the first available set.
+local SET_ALIASES = { paper = "scratchy-quill", calligraph = "scratchy-quill",
+                      water = "splash", pingpong = "ping-pong", jazzy = "jazz-piano",
+                      ["war-chant"] = "the-quest", lcars = "star-voyage" }
+-- Sound sets as Settings, the menu and alerts show them: { folder, name, a few words }.
+-- Edit names and descriptions freely, and reorder lines: within each category (see
+-- CATEGORIES below for their order) the list follows this order; sets not listed here
+-- come after, alphabetically, under their folder name. The folder name is the set's
+-- identity, so renaming here never breaks saved choices, recents, or performer pages.
+local SET_LIST = {
+  -- Recorded keyboards (press and release recordings)
+  { "cherrymx-black-abs",      "Cherry MX Black, ABS",     "heavy linear, deep and smooth" },
+  { "cherrymx-black-pbt",      "Cherry MX Black, PBT",     "heavy linear, drier PBT caps" },
+  { "cherrymx-red-abs",        "Cherry MX Red, ABS",       "light linear, quick and soft" },
+  { "cherrymx-brown-abs",      "Cherry MX Brown, ABS",     "tactile bump, no click" },
+  { "cherrymx-brown-pbt",      "Cherry MX Brown, PBT",     "tactile bump, PBT caps" },
+  { "browns",                  "Browns",                   "Cherry MX Brown, older single-sample pack" },
+  { "cherrymx-blue-abs",       "Cherry MX Blue, ABS",      "crisp clicky switches" },
+  { "cherrymx-blue-pbt",       "Cherry MX Blue, PBT",      "clicky, deeper PBT caps" },
+  { "blues",                   "Blues",                    "Cherry MX Blue, older single-sample pack" },
+  { "pandas",                  "Holy Pandas",              "strongly tactile, rounded" },
+  { "eg-crystal-purple",       "Everglide Crystal Purple", "tactile, bright housing" },
+  { "eg-oreo",                 "Everglide Oreo",           "tactile, muted" },
+  { "topre-purple-hybrid-pbt", "Topre Purple Hybrid",      "electro-capacitive thock" },
+  -- Interactive moods (music that follows your typing)
+  { "film-score",              "Film score",               "an action theme that builds to the hit" },
+  { "orchestra-build",         "Orchestra build",          "strings and brass swell to a cadence" },
+  { "techno-build",            "Techno build",             "a dance groove that builds as you type" },
+  { "the-quest",               "The Quest",                "a video-game quest choir and drums" },
+  { "khoomei",                 "Khoomei",                  "Tuvan throat singing on the steppe" },
+  { "live-chant",              "Live chant",               "Gregorian chant, a syllable per key" },
+  { "salon",                   "Salon",                    "a string quartet plays Mozart" },
+  { "harpsichord",             "Harpsichord",              "Bach's Prelude in C, bar by bar" },
+  { "jazz-piano",              "Jazz piano",               "bebop on a dusty upright" },
+  { "wurlitzer",               "Wurlitzer",                "soul electric piano" },
+  { "vibraphone",              "Vibraphone",               "a late-night lounge" },
+  { "schmoove-guitar",         "Schmoove guitar",          "bossa nova comping" },
+  { "slap-bass",               "Slap bass",                "a funk groove with drums" },
+  { "kalimba",                 "Kalimba",                  "interlocking mbira figures" },
+  { "hard-drive-music-box",    "Hard-drive music box",     "Brahms' lullaby, wound by hand" },
+  { "bagpipe",                 "Bagpipe",                  "Scotland the Brave over the drones" },
+  { "gregorian",               "Gregorian",                "choir notes over an organum drone" },
+  -- Fun sounds
+  { "thock",                   "Thock",                    "creamy synthesized keyboard" },
+  { "telegraph",               "Telegraph",                "a recorded telegraph sounder" },
+  { "ping-pong",               "Ping-pong",                "a table-tennis rally" },
+  { "tennis",                  "Tennis",                   "racket and ball" },
+  { "star-voyage",             "Star voyage",              "a starship console you can play" },
+  { "scratchy-quill",          "Scratchy quill",           "a quill scratching on paper" },
+  { "spark",                   "Spark",                    "electric sparks" },
+  { "splash",                  "Splash",                   "water splashes" },
+}
+local SET_INFO = {}
+for rank, entry in ipairs(SET_LIST) do SET_INFO[entry[1]] = { title = entry[2], about = entry[3], rank = rank } end
+
 local SCROLL_GAP = 0.05   -- min seconds between scroll ticks (trackpad throttle)
 local RECENT_LIMIT = 5
 local STUDIO_LABEL = "com.giantravens.klonk-studio"
 local PRESENTER_KEY_GAP = 1.4
 local PRESENTER_KEY_LIMIT = 6
 local AUDIO_QUEUE_LIMIT = 32
+local SUSTAIN_IDLE = 6     -- seconds of no input before a held sound fades out
+local SUSTAIN_FADE = 1.5   -- fade length when it does
+
+-- Play a random variant from the FIRST non-empty pool in a fallback chain,
+-- so click → down and scroll → up when a set ships no dedicated mouse WAVs.
+-- Rotate through the chosen variant's voice bank so repeats overlap + decay.
+local function play(...)
+  for _, pool in ipairs({ ... }) do
+    if pool and #pool > 0 then
+      local bank = pool[math.random(#pool)]
+      if #bank.copies > 0 then
+        bank.i = bank.i % #bank.copies + 1        -- next voice (round-robin)
+        local s = bank.copies[bank.i]
+        s:stop(); s:play()                        -- stop() only resets THIS copy
+      end
+      return
+    end
+  end
+end
 
 local function expand(p) return (p:gsub("^~", os.getenv("HOME"))) end
-
-local function listContains(items, wanted)
-  for _, item in ipairs(items) do if item == wanted then return true end end
-  return false
-end
 
 local function settingsList(key)
   local value = hs.settings.get(key)
@@ -166,7 +238,11 @@ function obj:_sets()
       end
     end
   end
-  table.sort(out)
+  table.sort(out, function(a, b)                 -- SET_LIST order, then the rest by name
+    local ra, rb = SET_INFO[a] and SET_INFO[a].rank or math.huge, SET_INFO[b] and SET_INFO[b].rank or math.huge
+    if ra ~= rb then return ra < rb end
+    return a < b
+  end)
   return out
 end
 
@@ -183,14 +259,14 @@ end
 -- generator knows what it synthesized — and tools/import_pack.py (recordings
 -- of real switches). The menu groups by reading it, so there's no hardcoded
 -- name→family map to drift; untagged or unknown sets land in "More sets".
-local CATEGORIES = {
-  { key = "environment", label = "Environments"          },
-  { key = "keyboard",    label = "Recorded keyboards"    },
-  { key = "percussive",  label = "Percussive objects"    },
-  { key = "mechanical",  label = "Machines & mechanisms" },
-  { key = "musical",     label = "Musical instruments"   },
-  { key = "themed",      label = "Playful effects"       },
-  { key = "other",       label = "More sets"             },
+local CATEGORIES = {   -- menu and settings order
+  { key = "keyboard",    label = "Recorded keyboards"     },
+  { key = "interactive", label = "Interactive moods"      },   -- music that morphs with your typing
+  { key = "themed",      label = "Fun sounds"             },
+  { key = "environment", label = "Environments"           },
+  { key = "percussive",  label = "Percussive objects"     },
+  { key = "mechanical",  label = "Machines and mechanisms" },
+  { key = "other",       label = "More sets"              },
 }
 
 function obj:_category(name)
@@ -200,6 +276,7 @@ function obj:_category(name)
   local c = ((f:read("*a") or ""):match("%a+") or ""):lower()
   f:close()
   if c == "samples" then c = "keyboard" end -- pre-2.3 compatibility
+  if c == "musical" or c == "performed" then c = "interactive" end -- merged October 2026
   for _, cat in ipairs(CATEGORIES) do if cat.key == c then return c end end
   return "other"
 end
@@ -235,11 +312,61 @@ function obj:_bank(path)
 end
 
 function obj:_load(name)
+  self:_stopKeyboardAudio()
   self._set = name
   self:_rememberRecent("_recentSets", "klonk.recentsets", name)
-  self._pool = {}
+  self._pool, self._sustainPath = {}, nil
   local dir = self:_setDir(name)
-  if not dir then return end
+  if dir then self._pool, self._sustainPath = self:_poolFor(dir) end
+  local kind = self:_performerKind(dir)
+  if kind then
+    self._sustainPath = nil              -- a performed set carries its own drones
+    self:_performerStart(kind)
+  else self:_performerStop() end
+  self:_loadMouse()
+end
+
+-- Which set voices clicks and scroll: the chosen click set, else the key set,
+-- else (a performed key set has no click sounds) the most recent keyboard or fun
+-- set. Another musical set is borrowed only when nothing else has clicks: going
+-- from bagpipe to film-score should not leave bagpipe clicks behind.
+function obj:_clickSource()
+  local function playable(name)
+    return name and self:_hasClicks(self:_setDir(name))
+  end
+  if playable(self._clickSet) then return self._clickSet end
+  if playable(self._set) then return self._set end
+  local function plain(name) return playable(name) and self:_category(name) ~= "interactive" end
+  for _, ok in ipairs({ plain, playable }) do
+    for _, name in ipairs(self._recentSets or {}) do if ok(name) then return name end end
+    for _, name in ipairs(self:_sets()) do if ok(name) then return name end end
+  end
+end
+
+local function stopPools(pool)
+  for _, banks in pairs(pool or {}) do
+    for _, bank in ipairs(banks) do
+      for _, sound in ipairs(bank.copies) do sound:stop() end
+    end
+  end
+end
+
+function obj:_loadMouse()
+  stopPools(self._mousePool)
+  local source = self:_clickSource()
+  if not source or source == self._set then
+    self._mousePool = nil
+  else
+    self._mousePool = (self:_poolFor(self:_setDir(source)))
+  end
+  self._mouseSet = source
+end
+
+-- Build voice pools for a set folder: generic stems (down, up, click, scroll…)
+-- plus the dedicated keycode files. Shared by _load and the settings preview.
+-- Also returns the path of an optional `sustain` file (see _sustainOn).
+function obj:_poolFor(dir)
+  local pool, sustain = {}, nil
   -- optional per-set polyphony override: a `voices` file holding one integer
   self._voiceOverride = nil
   local vf = io.open(dir .. "/voices", "r")
@@ -250,16 +377,61 @@ function obj:_load(name)
   for f in hs.fs.dir(dir) do
     if f:match("%.wav$") or f:match("%.aiff?$") or f:match("%.mp3$") then
       local stem = f:gsub("%.%w+$", ""):gsub("%d+$", "")
-      if GENERIC[stem] then
-        self._pool[stem] = self._pool[stem] or {}
-        table.insert(self._pool[stem], self:_bank(dir .. "/" .. f))
+      if stem == "sustain" then
+        sustain = dir .. "/" .. f
+      elseif GENERIC[stem] then
+        pool[stem] = pool[stem] or {}
+        table.insert(pool[stem], self:_bank(dir .. "/" .. f))
       else
         for kc, want in pairs(KEYFILE) do
-          if stem == want then self._pool[kc] = { self:_bank(dir .. "/" .. f) } end
+          if stem == want then pool[kc] = { self:_bank(dir .. "/" .. f) } end
         end
       end
     end
   end
+  return pool, sustain
+end
+
+-- A set may ship `sustain.wav`: a loop held under the playing, like bagpipe
+-- drones. The first key or click starts it, further input keeps it alive, Return
+-- ends it (the set's enter.wav carries the final flourish), and SUSTAIN_IDLE
+-- seconds of quiet fade it out so a stray click never drones forever.
+function obj:_sustainOn()
+  if not self._sustainPath then return end
+  if self._sustainFadeTimer then self._sustainFadeTimer:stop(); self._sustainFadeTimer = nil end
+  if not self._sustainSound then
+    self._sustainSound = hs.sound.getByFile(self._sustainPath)
+    if not self._sustainSound then self._sustainPath = nil; return end
+    self._sustainSound:loopSound(true)
+  end
+  self._sustainSound:volume(self._vol)
+  if not self._sustainSound:isPlaying() then self._sustainSound:play() end
+  if self._sustainIdleTimer then self._sustainIdleTimer:stop() end
+  self._sustainIdleTimer = hs.timer.doAfter(SUSTAIN_IDLE, function()
+    self._sustainIdleTimer = nil
+    self:_sustainOff(SUSTAIN_FADE)
+  end)
+end
+
+function obj:_sustainOff(fade)
+  if self._sustainIdleTimer then self._sustainIdleTimer:stop(); self._sustainIdleTimer = nil end
+  if self._sustainFadeTimer then self._sustainFadeTimer:stop(); self._sustainFadeTimer = nil end
+  local sound = self._sustainSound
+  if not sound then return end
+  if not fade or fade <= 0 then
+    sound:stop(); self._sustainSound = nil; return
+  end
+  local steps, step = 15, 0
+  self._sustainFadeTimer = hs.timer.doEvery(fade / steps, function()
+    step = step + 1
+    if step >= steps then
+      self._sustainFadeTimer:stop(); self._sustainFadeTimer = nil
+      sound:stop()
+      if self._sustainSound == sound then self._sustainSound = nil end
+    else
+      sound:volume(self._vol * (1 - step / steps))
+    end
+  end)
 end
 
 -- Ambient sounds are single loopable files (not folders). List their basenames
@@ -301,6 +473,7 @@ end
 function obj:_playAmbient(name)
   if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
   self._ambient = name
+  if name then hs.settings.set("klonk.lastambient", name) end
   self:_rememberRecent("_recentAmbient", "klonk.recentambient", name)
   if not name or self._audioMuted then return end
   local path = self:_ambientFile(name)
@@ -309,6 +482,8 @@ function obj:_playAmbient(name)
   if s then
     s:loopSound(true); s:volume(self._ambientVol); s:play()
     self._ambientSound = s
+  else
+    self._ambient = nil
   end
 end
 
@@ -385,60 +560,35 @@ end
 -- Symlink whatever Apple Aerials are downloaded (any category — Landscape,
 -- Cityscape, Underwater, Earth) into the folder; a symlink into the folder plays
 -- even though the target is root-owned /Library. Scans BOTH stores (screensaver +
--- wallpaper). Friendly names come from entries.json (id → accessibilityLabel).
--- SDR only from idleassetsd (skip HDR washout); the wallpaper store is already
--- SDR. Dedups by name, prunes symlinks whose target has vanished. Returns count.
+-- wallpaper). Names come from the merged catalog in aerials.lua, which gives
+-- repeated labels a take number so every take is its own desktop. A real file
+-- already holding the name (a download from _downloadAerials) is never replaced.
+-- Prunes symlinks whose target has vanished. Returns count.
 function obj:_syncAerials()
   local dir = self:_wpDir(); hs.fs.mkdir(dir)
-  -- Merge id→name from BOTH catalogs: the idleassetsd one and the wallpaper
-  -- store's own manifest (newer, names the recently-added aerials the old one
-  -- lacks). Wallpaper manifest is read second so it wins on any conflict.
-  local names = {}
-  for _, ejson in ipairs({
-    AERIAL_ROOT .. "/entries.json",
-    (AERIAL_WP:gsub("/videos$", "")) .. "/manifest/entries.json",
-  }) do
-    local fh = io.open(ejson, "r")
-    if fh then
-      local ok, data = pcall(hs.json.decode, fh:read("a")); fh:close()
-      if ok and type(data) == "table" and data.assets then
-        for _, a in ipairs(data.assets) do
-          if a.id then names[a.id:lower()] = a.accessibilityLabel or a.id end
-        end
-      end
-    end
-  end
-  -- Collect source dirs: idleassetsd SDR subdirs + the flat wallpaper store.
-  local sources = {}
-  if hs.fs.attributes(AERIAL_ROOT) then
-    for sub in hs.fs.dir(AERIAL_ROOT) do
-      local subdir = AERIAL_ROOT .. "/" .. sub
-      if sub:find("SDR") and hs.fs.attributes(subdir, "mode") == "directory" then
-        sources[#sources + 1] = subdir
-      end
-    end
-  end
-  if hs.fs.attributes(AERIAL_WP) then sources[#sources + 1] = AERIAL_WP end
-
+  local catalog = self:_aerialCatalog()
   local linked, seen = 0, {}
-  for _, srcdir in ipairs(sources) do
+  for _, srcdir in ipairs(self:_aerialSources()) do
     for f in hs.fs.dir(srcdir) do
       local uuid = f:match("^(.+)%.mov$")
       if uuid then
-        local nm   = (names[uuid:lower()] or uuid):gsub("[/:]", "-")
-        local base = "Aerial - " .. nm .. ".mov"
+        local entry = catalog[uuid:lower()]
+        local base = entry and entry.file or ("Aerial - " .. uuid .. ".mov")
         if not seen[base] then                                 -- dedup: same aerial can be in both stores
           seen[base] = true
           local link = dir .. "/" .. base
-          os.remove(link)
-          if hs.fs.link(srcdir .. "/" .. f, link, true) then linked = linked + 1 end
+          local la = hs.fs.symlinkAttributes(link)
+          if not la or la.mode == "link" then
+            os.remove(link)
+            if hs.fs.link(srcdir .. "/" .. f, link, true) then linked = linked + 1 end
+          end
         end
       end
     end
   end
   -- Prune symlinks that are dangling (target gone) OR stale "Aerial - …" links
   -- not (re)created this run — the latter clears duplicates left behind when an
-  -- aerial gains a better name. Real user-dropped files (not symlinks) are kept.
+  -- aerial gains a better name. Real files (drops and downloads) are kept.
   for f in hs.fs.dir(dir) do
     local p  = dir .. "/" .. f
     local la = hs.fs.symlinkAttributes(p)
@@ -458,12 +608,15 @@ function obj:_writeWallpaperHTML(name)
     'video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;',
     'opacity:0;transition:opacity ' .. string.format("%.2f", WP_FADE_SECONDS) .. 's ease}',
     'video.ready{opacity:1}',
+    '@media(prefers-reduced-motion:reduce){video{transition:none}}',
     '</style></head><body><video autoplay loop muted playsinline></video><script>',
     'var v=document.querySelector("video"), R=' .. string.format("%.4f", self._wpSpeed) .. ';',
     'v.src=' .. jsString(name) .. '; v.muted=true; v.loop=true;',
-    'function go(){v.playbackRate=R; var p=v.play();',
+    'var motion=matchMedia("(prefers-reduced-motion: reduce)");',
+    'function go(){if(motion.matches){v.pause();v.classList.add("ready");return;}v.playbackRate=R; var p=v.play();',
     'if(p&&p.then)p.then(function(){requestAnimationFrame(function(){v.classList.add("ready")})})',
     '.catch(function(){});else requestAnimationFrame(function(){v.classList.add("ready")});}',
+    'motion.addEventListener("change",go);v.autoplay=!motion.matches;',
     'v.addEventListener("canplay",go); go();',
     'v.addEventListener("ended",function(){v.currentTime=0;go();});',
     'document.addEventListener("visibilitychange",function(){if(!document.hidden)go();});',
@@ -562,6 +715,7 @@ end
 
 function obj:_setWallpaper(name, keepSchedule)
   self._wp = name
+  if name then hs.settings.set("klonk.lastwallpaper", name) end
   self:_rememberRecent("_recentWallpapers", "klonk.recentwallpapers", name)
   if name then hs.settings.set("klonk.wallpaper", name) else hs.settings.clear("klonk.wallpaper") end
   self:_applyWallpaper()
@@ -584,7 +738,8 @@ function obj:_restartWallpaperTimer()
   if self._wpChangeTimer then self._wpChangeTimer:stop(); self._wpChangeTimer = nil end
   if self._wp and self._wpChangeMinutes > 0 then
     self._wpChangeTimer = hs.timer.doEvery(self._wpChangeMinutes * 60, function()
-      if not (self._wpPauseBattery and hs.battery.powerSource() == "Battery Power") then
+      if not (self._wpPauseBattery and hs.battery.powerSource() == "Battery Power")
+         and not hs.screen.accessibilitySettings().ReduceMotion then
         self:_shuffleWallpaper()
       end
     end)
@@ -805,19 +960,24 @@ function obj:_queuePresenterClick(point, rightClick)
   self._presenterClickQueue[timer] = true
 end
 
-function obj:_updatePresenterTapWatch()
-  if self._presenter and not self._presenterTapWatchTimer then
-    self._presenterTapWatchTimer = hs.timer.doEvery(0.25, function()
-      if self._presenter and self._tap and not self._tap:isEnabled() then
-        self._presenterTapRecoveries = self._presenterTapRecoveries + 1
-        hs.printf("klonk presenter: event tap disabled; recovery #%d",
-          self._presenterTapRecoveries)
+-- macOS disables an event tap it judges slow and never re-enables it, so keys go
+-- silent until something restarts the tap (any settings toggle does, via _refresh).
+-- Watch whenever the tap should be running: for sounds as well as for presenter mode.
+function obj:_tapWanted() return (self._on and not self._audioMuted) or self._presenter end
+
+function obj:_updateTapWatch()
+  if self:_tapWanted() and not self._tapWatchTimer then
+    self._tapWatchTimer = hs.timer.doEvery(0.25, function()
+      if self:_tapWanted() and self._tap and not self._tap:isEnabled() then
+        self._tapRecoveries = self._tapRecoveries + 1
+        hs.printf("klonk event tap disabled by macOS; recovery #%d (slowest callback %.1f ms)",
+          self._tapRecoveries, self._eventTapMaxSeconds * 1000)
         self._tap:start()
       end
     end)
-  elseif not self._presenter and self._presenterTapWatchTimer then
-    self._presenterTapWatchTimer:stop()
-    self._presenterTapWatchTimer = nil
+  elseif not self:_tapWanted() and self._tapWatchTimer then
+    self._tapWatchTimer:stop()
+    self._tapWatchTimer = nil
   end
 end
 
@@ -838,42 +998,19 @@ end
 function obj:_refresh()
   if self._menu then self._menu:setIcon(icon(not self._audioMuted and self._on)) end
   if self._tap then
-    local audioListening = self._on and not self._audioMuted
-    if audioListening or self._presenter then self._tap:start() else self._tap:stop() end
+    if self:_tapWanted() then self._tap:start() else self._tap:stop() end
   end
-  self:_updatePresenterTapWatch()
+  self:_updateTapWatch()
   hs.settings.set("klonk.audiomuted", self._audioMuted)
   hs.settings.set("klonk.on", self._on)
+  hs.settings.set("klonk.keys", self._keys)
   hs.settings.set("klonk.mouse", self._mouse)
+  hs.settings.set("klonk.scroll", self._scroll)
+  hs.settings.set("klonk.clickset", self._clickSet)
   hs.settings.set("klonk.set", self._set)
   hs.settings.set("klonk.vol", self._vol)
   hs.settings.set("klonk.ambient", self._ambient)
   hs.settings.set("klonk.ambientvol", self._ambientVol)
-end
-
-local function pickerRows(names, current, titleFor, onPick)
-  local rows = {}
-  for _, name in ipairs(names) do
-    local selected = name
-    rows[#rows + 1] = {
-      title = titleFor and titleFor(selected) or selected,
-      checked = (selected == current),
-      fn = function() onPick(selected) end,
-    }
-  end
-  return rows
-end
-
-local function availableRecents(recent, available)
-  local rows = {}
-  for _, name in ipairs(recent or {}) do
-    if listContains(available, name) then rows[#rows + 1] = name end
-  end
-  return rows
-end
-
-local function clipTitle(name)
-  return name:gsub("^Aerial %- ", ""):gsub("%.%w+$", "")
 end
 
 function obj:_ambientSource(name)
@@ -962,230 +1099,35 @@ function obj:_openStudio()
 end
 
 function obj:_menuItems()
-  -- ---- Shared volume controls ---------------------------------------------
-  local vol = {}
-  for _, v in ipairs(VOLUMES) do
-    vol[#vol + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
-      checked = (math.abs(v - self._vol) < 0.01),
-      fn = function()
-        self._vol = v
-        for _, pool in pairs(self._pool) do
-          for _, bank in ipairs(pool) do
-            for _, snd in ipairs(bank.copies) do snd:volume(v) end
-          end
-        end
-        self:_refresh()
-      end }
-  end
-
-  -- ---- Keyboard sounds ----------------------------------------------------
-  local sets, groupedSets = self:_sets(), {}
-  for _, s in ipairs(self:_sets()) do
-    local category = self:_category(s)
-    groupedSets[category] = groupedSets[category] or {}
-    groupedSets[category][#groupedSets[category] + 1] = s
-  end
-  local browseSets = {}
-  for _, category in ipairs(CATEGORIES) do
-    local names = groupedSets[category.key]
-    if names then
-      browseSets[#browseSets + 1] = {
-        title = category.label,
-        checked = listContains(names, self._set),
-        menu = pickerRows(names, self._set, nil, function(name)
-          self:_load(name); self:_refresh()
-        end),
-      }
-    end
-  end
-  local kbControls = {
-    { title = self._mouse and "Turn mouse clicks off" or "Turn mouse clicks on",
-      fn = function() self._mouse = not self._mouse; self:_refresh() end },
-    { title = "Volume", menu = vol },
-  }
-  local kbLibrary = {
-    { title = "Add sound sets…", fn = function()
-      local d = expand("~/Music/Klonk/keyboard"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
-    end },
-    { title = "Get recorded keyboard sounds…", fn = function()
-      hs.urlevent.openURL("https://github.com/giantravens/klonk#real-recorded-keyboards")
-    end },
-    { title = "a set = folder of WAVs: down1..N, up1..N,", disabled = true, indent = 1 },
-    { title = "space, enter, backspace; optional click, scroll", disabled = true, indent = 1 },
-  }
-  local kb = {
-    { title = "Current — " .. tostring(self._set), disabled = true },
-    { title = self._on and "Turn keyboard sounds off" or "Turn keyboard sounds on",
-      fn = function() self._on = not self._on; self:_refresh() end },
-  }
-  local recentSets = availableRecents(self._recentSets, sets)
-  if #recentSets > 0 then
-    kb[#kb + 1] = { title = "Recent", menu = pickerRows(recentSets, self._set, nil, function(name)
-      self:_load(name); self:_refresh()
-    end) }
-  end
-  kb[#kb + 1] = { title = "Browse all", menu = browseSets }
-  kb[#kb + 1] = { title = "Controls", menu = kbControls }
-  kb[#kb + 1] = { title = "Library", menu = kbLibrary }
-
-  -- ---- Ambient sounds -----------------------------------------------------
-  local ambientVolumes = {}
-  for _, v in ipairs(VOLUMES) do
-    ambientVolumes[#ambientVolumes + 1] = { title = math.floor(v * 100 + 0.5) .. "%",
-      checked = (math.abs(v - self._ambientVol) < 0.01),
-      fn = function()
-        self._ambientVol = v
-        if self._ambientSound then self._ambientSound:volume(v) end
-        self:_refresh()
-      end }
-  end
-  local ambientNames = self:_ambientSounds()
-  local ambientGroups = { bundled = {}, personal = {}, legacy = {} }
-  for _, name in ipairs(ambientNames) do
-    local source = self:_ambientSource(name)
-    ambientGroups[source][#ambientGroups[source] + 1] = name
-  end
-  local browseAmbient = {}
-  for _, source in ipairs({
-    { key = "bundled", title = "Included with Klonk" },
-    { key = "personal", title = "My Library" },
-    { key = "legacy", title = "Legacy folders" },
-  }) do
-    local names = ambientGroups[source.key]
-    if #names > 0 then
-      browseAmbient[#browseAmbient + 1] = {
-        title = source.title,
-        checked = self._ambient and listContains(names, self._ambient) or false,
-        menu = pickerRows(names, self._ambient, nil, function(name)
-          self:_playAmbient(name); self:_refresh()
-        end),
-      }
-    end
-  end
-  local amb = {
-    { title = "Current — " .. (self._ambient or "Off"), disabled = true },
-    { title = "Off", checked = (self._ambient == nil),
-      fn = function() self:_playAmbient(nil); self:_refresh() end },
-  }
-  local recentAmbient = availableRecents(self._recentAmbient, ambientNames)
-  if #recentAmbient > 0 then
-    amb[#amb + 1] = { title = "Recent",
-      menu = pickerRows(recentAmbient, self._ambient, nil, function(name)
-        self:_playAmbient(name); self:_refresh()
-      end) }
-  end
-  amb[#amb + 1] = { title = "Browse all", menu = browseAmbient }
-  amb[#amb + 1] = { title = "Controls", menu = {
-    { title = "Volume", menu = ambientVolumes },
-  } }
-  amb[#amb + 1] = { title = "Library", menu = {
-    { title = "Add ambient sounds…", fn = function()
-      local d = expand("~/Music/Klonk/ambient"); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
-    end },
-  } }
-
-  -- ---- Video desktop ------------------------------------------------------
-  local spd = {}
-  for _, option in ipairs(WP_SPEEDS) do
-    local rate = option.rate
-    spd[#spd + 1] = { title = option.title,
-      checked = (math.abs(rate - self._wpSpeed) < 0.001),
-      fn = function() self:_setWallpaperSpeed(rate) end }
-  end
-  local cadence = {}
-  for _, minutes in ipairs(WP_CHANGE_MINUTES) do
-    cadence[#cadence + 1] = {
-      title = minutes == 0 and "Never — loop selected" or ("Every " .. minutes .. " minutes"),
-      checked = (minutes == self._wpChangeMinutes),
-      fn = function() self:_setWallpaperChangeMinutes(minutes) end,
-    }
-  end
-  local clips = self:_wallpapers()
-  local videoGroups = { aerials = {}, personal = {} }
-  for _, name in ipairs(clips) do
-    local group = name:match("^Aerial %- ") and "aerials" or "personal"
-    videoGroups[group][#videoGroups[group] + 1] = name
-  end
-  local browseVideo = {}
-  for _, source in ipairs({
-    { key = "aerials", title = "Apple Aerials" },
-    { key = "personal", title = "My Clips" },
-  }) do
-    local names = videoGroups[source.key]
-    if #names > 0 then
-      browseVideo[#browseVideo + 1] = {
-        title = source.title,
-        checked = self._wp and listContains(names, self._wp) or false,
-        menu = pickerRows(names, self._wp, clipTitle, function(name) self:_setWallpaper(name) end),
-      }
-    end
-  end
-  local vid = {
-    { title = "Current — " .. (self._wp and clipTitle(self._wp) or "Off"), disabled = true },
-    { title = "Off", checked = (self._wp == nil),
-      fn = function() self:_setWallpaper(nil) end },
-    { title = "Shuffle now", disabled = (#clips == 0), fn = function() self:_shuffleWallpaper() end },
-  }
-  local recentVideos = availableRecents(self._recentWallpapers, clips)
-  if #recentVideos > 0 then
-    vid[#vid + 1] = { title = "Recent",
-      menu = pickerRows(recentVideos, self._wp, clipTitle, function(name) self:_setWallpaper(name) end) }
-  end
-  vid[#vid + 1] = { title = "Browse all", disabled = (#clips == 0), menu = browseVideo }
-  vid[#vid + 1] = { title = "Playback", menu = {
-    { title = "Speed", menu = spd, checked = (self._wpSpeed ~= 1.0) },
-    { title = "Change desktop", menu = cadence, checked = (self._wpChangeMinutes > 0) },
-    { title = "Pause on battery", checked = self._wpPauseBattery,
-      fn = function()
-        self._wpPauseBattery = not self._wpPauseBattery
-        hs.settings.set("klonk.wppausebattery", self._wpPauseBattery)
-        self:_applyWallpaper()
-      end },
-  } }
-  local videoLibrary = {
-    { title = "Sync Apple aerials now", fn = function()
-      local n = self:_syncAerials()
-      hs.alert.show(n > 0
-        and ("Linked " .. n .. " Apple aerial" .. (n == 1 and "" or "s") .. " — reopen this menu")
-        or  "No aerials downloaded — add them in System Settings ▸ Wallpaper, then sync")
-    end },
-    { title = "Add your own clips…", fn = function()
-      local d = self:_wpDir(); hs.fs.mkdir(d); hs.execute(("open '%s'"):format(d))
-    end },
-  }
-  if #clips == 0 then
-    videoLibrary[#videoLibrary + 1] = {
-      title = "No clips yet — add .mp4/.mov, or sync aerials above", disabled = true
-    }
-  end
-  vid[#vid + 1] = { title = "Library", menu = videoLibrary }
-
-  local presenter = {
-    { title = self._presenter and "Stop" or "Start",
-      fn = function() self:togglePresenter() end },
-    { title = "Keys shown", menu = {
-      { title = "All keys", checked = not self._presenterSpecialOnly,
-        fn = function() self:_setPresenterSpecialOnly(false) end },
-      { title = "Special keys only", checked = self._presenterSpecialOnly,
-        fn = function() self:_setPresenterSpecialOnly(true) end },
-    } },
-  }
-
-  -- ---- Top level: experience groups and session utilities ------------------
   return {
-    { title = hs.styledtext.new("klonk", { font = { name = "Menlo-Bold", size = 11 },
-        color = { white = 0.5 } }), disabled = true },
+    { title = "Settings…", fn = function() self:showSettings() end },
     { title = "-" },
-    { title = self._audioMuted and "All sounds on" or "All sounds off",
+    { title = self._audioMuted and "Unmute all sounds" or "Mute all sounds",
       fn = function() self:_setAudioMuted(not self._audioMuted) end },
+    { title = self._wp and "Pause live desktop" or "Resume live desktop",
+      disabled = not self._wp and #self:_wallpapers() == 0,
+      fn = function() self:_setDesktopEnabled(self._wp == nil) end },
+    { title = self._presenter and "Stop Presenter mode" or "Start Presenter mode",
+      fn = function() self:togglePresenter() end },
     { title = "-" },
-    { title = "Keyboard sounds", menu = kb,  checked = self._on },
-    { title = "Ambient sounds",  menu = amb, checked = (self._ambient ~= nil) },
-    { title = "Video desktop",   menu = vid, checked = (self._wp ~= nil) },
-    { title = "-" },
-    { title = "Presenter mode", menu = presenter, checked = self._presenter },
+    { title = "Open Klonk Tools…", fn = function() self:showSettings("tools") end },
     { title = "Open Klonk Studio…", fn = function() self:_openStudio() end },
   }
+end
+
+-- Silence the already-playing tails as well as future input. Clearing queued
+-- voices prevents a next-run-loop sound from escaping a just-issued mute.
+function obj:_stopKeyboardAudio()
+  self:_sustainOff(0)
+  if self._performerSilence then self:_performerSilence() end
+  if self._audioDrainTimer then self._audioDrainTimer:stop(); self._audioDrainTimer = nil end
+  self._audioQueue = {}
+  stopPools(self._mousePool)
+  for _, pool in pairs(self._pool) do
+    for _, bank in ipairs(pool) do
+      for _, sound in ipairs(bank.copies) do sound:stop() end
+    end
+  end
 end
 
 --- Klonk:toggle()
@@ -1198,18 +1140,22 @@ end
 function obj:_setAudioMuted(muted)
   self._audioMuted = muted
   if muted then
+    self:_stopKeyboardAudio()
+    self:_stopSettingsPreview()
     if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
   elseif self._ambient then
     self:_playAmbient(self._ambient)
   end
+  if self._performerVolume then self:_performerVolume() end
   self:_refresh()
 end
 
 --- Klonk:toggleMouse()
 --- Method
---- Toggles mouse-click and scroll sounds on/off, independent of keystrokes.
+--- Toggles mouse-click and scroll sounds on/off together, independent of keystrokes.
 function obj:toggleMouse()
-  self._mouse = not self._mouse; self:_refresh(); return self
+  local on = not (self._mouse or self._scroll)
+  self._mouse, self._scroll = on, on; self:_refresh(); return self
 end
 
 --- Klonk:togglePresenter()
@@ -1234,6 +1180,14 @@ function obj:_setPresenterSpecialOnly(specialOnly)
   self._presenterKeys = {}
 end
 
+-- A set's name, description and place in the list, from SET_LIST.
+function obj:_setTitle(name)
+  local info = SET_INFO[name]
+  return info and info.title or (tostring(name or ""):gsub("[-_]", " "))
+end
+function obj:_setAbout(name) return SET_INFO[name] and SET_INFO[name].about or "" end
+function obj:_setRank(name) return SET_INFO[name] and SET_INFO[name].rank or math.huge end
+
 --- Klonk:cycleSet(step)
 --- Method
 --- Switches to the next (step 1) or previous (step -1) sound set.
@@ -1244,7 +1198,7 @@ function obj:cycleSet(step)
   for k, s in ipairs(sets) do if s == self._set then i = k end end
   i = ((i - 1 + (step or 1)) % #sets) + 1
   self:_load(sets[i]); self:_refresh()
-  hs.alert.show("klonk: " .. sets[i], 0.7)
+  hs.alert.show("klonk: " .. self:_setTitle(sets[i]), 0.7)
   return self
 end
 
@@ -1271,9 +1225,20 @@ end
 function obj:start()
   self._audioMuted = hs.settings.get("klonk.audiomuted") or false
   self._on = hs.settings.get("klonk.on"); if self._on == nil then self._on = true end
+  self._keys = hs.settings.get("klonk.keys"); if self._keys == nil then self._keys = true end
   self._mouse = hs.settings.get("klonk.mouse"); if self._mouse == nil then self._mouse = true end
+  -- Scroll used to share the mouse flag; inherit it once so upgrades keep their choice.
+  self._scroll = hs.settings.get("klonk.scroll"); if self._scroll == nil then self._scroll = self._mouse end
+  self._clickSet = hs.settings.get("klonk.clickset")
+  self._clickSet = SET_ALIASES[self._clickSet] or self._clickSet
   self._vol = hs.settings.get("klonk.vol") or 0.7
-  self._recentSets = settingsList("klonk.recentsets")
+  self._recentSets = {}
+  for _, name in ipairs(settingsList("klonk.recentsets")) do
+    local current = SET_ALIASES[name] or name
+    local seen = false
+    for _, kept in ipairs(self._recentSets) do seen = seen or kept == current end
+    if not seen then self._recentSets[#self._recentSets + 1] = current end
+  end
   self._recentAmbient = settingsList("klonk.recentambient")
   self._recentWallpapers = settingsList("klonk.recentwallpapers")
   local savedSet = hs.settings.get("klonk.set")
@@ -1288,38 +1253,40 @@ function obj:start()
   local et = hs.eventtap.event.types
   local props = hs.eventtap.event.properties
 
-  -- Play a random variant from the FIRST non-empty pool in a fallback chain,
-  -- so click → down and scroll → up when a set ships no dedicated mouse WAVs.
-  -- Rotate through the chosen variant's voice bank so repeats overlap + decay.
-  local function play(...)
-    for _, pool in ipairs({ ... }) do
-      if pool and #pool > 0 then
-        local bank = pool[math.random(#pool)]
-        bank.i = bank.i % #bank.copies + 1        -- next voice (round-robin)
-        local s = bank.copies[bank.i]
-        s:stop(); s:play()                        -- stop() only resets THIS copy
-        return
-      end
-    end
-  end
-
   -- Never perform NSSound stop/play inside the CGEventTap callback: that
   -- callback gates delivery to the foreground app. Queue compact pool chains
   -- and drain them on the next run-loop turn instead.
+  local function scheduleDrain()
+    if not self._audioDrainTimer then
+      self._audioDrainTimer = hs.timer.doAfter(0, function()
+        self._audioDrainTimer = nil
+        local pending = self._audioQueue
+        self._audioQueue = {}
+        local performed = {}
+        for _, chain in ipairs(pending) do
+          if chain.perform then performed[#performed + 1] = chain.perform
+          elseif chain.sustain == "on" then self:_sustainOn()
+          elseif chain.sustain == "off" then self:_sustainOff(0)
+          else play(table.unpack(chain)) end
+        end
+        self:_performerSend(performed)
+      end)
+    end
+  end
+
   local function queuePlay(...)
     if #self._audioQueue >= AUDIO_QUEUE_LIMIT then
       table.remove(self._audioQueue, 1)
       self._audioQueueDrops = self._audioQueueDrops + 1
     end
     self._audioQueue[#self._audioQueue + 1] = { ... }
-    if not self._audioDrainTimer then
-      self._audioDrainTimer = hs.timer.doAfter(0, function()
-        self._audioDrainTimer = nil
-        local pending = self._audioQueue
-        self._audioQueue = {}
-        for _, chain in ipairs(pending) do play(table.unpack(chain)) end
-      end)
-    end
+    scheduleDrain()
+  end
+
+  -- Performed sets take raw key events (with timing) instead of pool chains.
+  local function queuePerform(event)
+    self._audioQueue[#self._audioQueue + 1] = { perform = event }
+    scheduleDrain()
   end
 
   self._tap = hs.eventtap.new({
@@ -1335,20 +1302,38 @@ function obj:start()
     if t == et.keyDown then
       local isRepeat = e:getProperty(props.keyboardEventAutorepeat) == 1
       if self._presenter then self:_presenterKeyDown(e, isRepeat) end
-      if audioListening then queuePlay(p[e:getKeyCode()], p.down) end
+      if audioListening and self._keys and self._performer then
+        queuePerform({ "d", e:getKeyCode(), hs.timer.absoluteTime() / 1e6, isRepeat })
+      elseif audioListening and self._keys then
+        local code = e:getKeyCode()
+        if self._sustainPath and not isRepeat then
+          self._audioQueue[#self._audioQueue + 1] = { sustain = code == 36 and "off" or "on" }
+        end
+        queuePlay(p[code], p.down)
+      end
     elseif t == et.keyUp then
-      if audioListening then queuePlay(p.up) end
+      if audioListening and self._keys and self._performer then
+        queuePerform({ "u", e:getKeyCode(), hs.timer.absoluteTime() / 1e6 })
+      elseif audioListening and self._keys then queuePlay(p.up) end
     elseif t == et.flagsChanged then
       if self._presenter then self:_presenterFlagsChanged(e) end
     elseif t == et.leftMouseDown then
       if self._presenter then self:_queuePresenterClick(e:location(), false) end
-      if audioListening and self._mouse then queuePlay(p.click, p.down) end
+      if audioListening and self._mouse then
+        local m = self._mousePool or p
+        if self._sustainPath and not self._mousePool then self._audioQueue[#self._audioQueue + 1] = { sustain = "on" } end
+        queuePlay(m.click, m.down)
+      end
     elseif t == et.rightMouseDown then
       if self._presenter then self:_queuePresenterClick(e:location(), true) end
-      if audioListening and self._mouse then queuePlay(p.rightclick, p.click, p.down) end
+      if audioListening and self._mouse then
+        local m = self._mousePool or p
+        if self._sustainPath and not self._mousePool then self._audioQueue[#self._audioQueue + 1] = { sustain = "on" } end
+        queuePlay(m.rightclick, m.click, m.down)
+      end
     elseif t == et.leftMouseUp or t == et.rightMouseUp then
-      if audioListening and self._mouse then queuePlay(p.clickup, p.up) end
-    elseif t == et.scrollWheel and audioListening and self._mouse then
+      if audioListening and self._mouse then local m = self._mousePool or p; queuePlay(m.clickup, m.up) end
+    elseif t == et.scrollWheel and audioListening and self._scroll then
       -- Tick on wheel notches and active trackpad scroll, but stay SILENT during
       -- inertial "momentum" coasting (phase ~= 0). Throttle so a fast two-finger
       -- swipe is a gentle tick-tick, not a roar.
@@ -1356,7 +1341,8 @@ function obj:start()
         local now = hs.timer.secondsSinceEpoch()
         if now - self._lastScroll >= SCROLL_GAP then
           self._lastScroll = now
-          queuePlay(p.scroll, p.up)
+          local m = self._mousePool or p
+          queuePlay(m.scroll, m.up)
         end
       end
     end
@@ -1394,14 +1380,18 @@ end
 --- Method
 --- Removes the menu-bar item and stops listening.
 function obj:stop()
+  self:_closeSettings()
+  self:_cancelAerials()
+  self:_stopKeyboardAudio()
+  self:_performerStop()
   if self._tap then self._tap:stop(); self._tap = nil end
   if self._audioDrainTimer then self._audioDrainTimer:stop(); self._audioDrainTimer = nil end
   self._audioQueue = {}
   self._presenter = false
   self:_tearDownPresenter()
-  if self._presenterTapWatchTimer then
-    self._presenterTapWatchTimer:stop()
-    self._presenterTapWatchTimer = nil
+  if self._tapWatchTimer then
+    self._tapWatchTimer:stop()
+    self._tapWatchTimer = nil
   end
   if self._ambientSound then self._ambientSound:stop(); self._ambientSound = nil end
   if self._wpChangeTimer then self._wpChangeTimer:stop(); self._wpChangeTimer = nil end
@@ -1418,17 +1408,28 @@ end
 --- Klonk:bindHotkeys(mapping)
 --- Method
 --- Binds hotkeys. Keys: `toggle`, `toggleMouse`, `togglePresenter`, `nextSet`,
---- `prevSet`. Example:
+--- `prevSet`, `settings`. Example:
 --- `spoon.Klonk:bindHotkeys({ toggle = {{"cmd","alt"}, "k"} })`
 function obj:bindHotkeys(mapping)
   hs.spoons.bindHotkeysToSpec({
     toggle      = function() self:toggle() end,
     toggleMouse = function() self:toggleMouse() end,
     togglePresenter = function() self:togglePresenter() end,
+    settings = function() self:showSettings() end,
     nextSet     = function() self:cycleSet(1) end,
     prevSet     = function() self:cycleSet(-1) end,
   }, mapping)
   return self
 end
+
+-- Load bundled UI beside this file, including when the Spoon is symlinked.
+local resourceDir = debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./"
+dofile(resourceDir .. "aerials.lua")(obj, { root = AERIAL_ROOT, wallpaperStore = AERIAL_WP })
+obj._loadedAt = os.time()                 -- tests compare this with file times to catch stale code
+dofile(resourceDir .. "performer.lua")(obj, resourceDir)
+dofile(resourceDir .. "settings.lua")(obj, resourceDir, {
+  speeds = WP_SPEEDS, cadences = WP_CHANGE_MINUTES, categories = CATEGORIES,
+  play = play, keyfile = KEYFILE,
+})
 
 return obj

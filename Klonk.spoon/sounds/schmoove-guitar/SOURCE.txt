@@ -1,0 +1,7 @@
+Set 'schmoove-guitar' built by tools/instruments.py.
+
+Synthesized: a hollow-body jazz guitar on the neck pickup, modeled with
+Karplus-Strong plucked strings (fractional-delay tuned), strummed extended voicings,
+palm-muted comping stabs, and a slow Cmaj9 on Return. No samples.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=schmoove-guitar

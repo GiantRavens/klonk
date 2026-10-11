@@ -17,7 +17,7 @@ ambient sound.
 
 ## Video desktop
 
-The **Video desktop** submenu loops a scenic clip *behind* your desktop icons —
+The **Live desktop** card in **Settings → Sound and motion** loops a scenic clip *behind* your desktop icons —
 the desktop-window trick every live-wallpaper app uses, but with no extra app and
 no login item. klonk renders the clip in an `hs.webview` pinned one level below the
 icon layer (in front of the wallpaper, behind your icons), muted and looped, one
@@ -47,6 +47,22 @@ ships. It scans **both** places macOS keeps them:
 > aerials now* and it appears in your picker. Names come from Apple's own catalogs;
 > a brand-new aerial not yet catalogued shows as its raw UUID (it still plays).
 
+**Or download a whole collection.** Activating twenty Underwater clips one at a time
+is tedious, so **Settings ▸ Tools ▸ Apple Aerials** downloads a collection
+(Underwater, Landscapes, Cities, Space, …) straight from Apple's CDN, using the
+direct 4K SDR URLs in Apple's own catalogs. It looks before it leaps: choosing a
+collection counts what is already on this Mac, asks Apple's server for each
+missing clip's exact size, and checks that at least 5 GB stays free, so you see
+"20 clips to download, 7.7 GB" before a byte moves. Downloads run one at a time
+with curl into a hidden `.part` file, resume where they stopped (Stop, reload,
+or a network drop), abort on a two-minute stall, and are renamed into place only
+when the size matches Apple's. They are real files (the whole Underwater set is
+about 8 GB) named like the synced links, so they sit under *Apple Aerials* in the
+picker. Repeated names such as the three Palau Jellies takes become
+"Palau Jellies", "Palau Jellies 2", "Palau Jellies 3". Every step logs a
+`klonk aerials event=…` line to the Hammerspoon console with a failure class
+(`curl-22` HTTP, `curl-28` stall, `size-mismatch`, …).
+
 **Loop or rotate.** By default, the chosen desktop loops continuously. **Shuffle
 now** picks a different clip immediately; **Change desktop** can keep looping the
 selection or choose a different clip every 20, 60, or 120 minutes. Each change
@@ -56,7 +72,7 @@ videos participate together. A persistent black canvas sits beneath the transpar
 video view during each swap, preventing WebKit's briefly unpainted white surface
 from flashing through. It does not include non-video macOS screen savers.
 
-**Slow motion.** The **Speed** submenu ranges from **0.75× Gentle** and **0.5×
+**Slow motion.** The **Playback speed** picker ranges from **0.75× Gentle** and **0.5×
 Calm** through **0.25× Dreamy**, **0.1× Deep drift**, and **0.05× Near-still**.
 Browser playback repeats source frames rather than inventing intermediate ones,
 so the labels call out when the result becomes intentionally stepped: a typical
@@ -113,28 +129,55 @@ spoon.Klonk:bindHotkeys({
   toggle      = {{"cmd", "alt"}, "k"},   -- mute/unmute everything
   toggleMouse = {{"cmd", "alt"}, "m"},   -- mute/unmute mouse clicks + scroll
   togglePresenter = {{"cmd", "alt"}, "p"}, -- show keys and highlight clicks
+  settings    = {{"cmd", "alt"}, ","},   -- open Settings
   nextSet     = {{"cmd", "alt"}, "]"},   -- next set
   prevSet     = {{"cmd", "alt"}, "["},   -- previous set
 })
 ```
 
-Reload Hammerspoon. A keyboard icon appears in the menu bar. **All sounds off**
-mutes keyboard, mouse, and ambient audio together without forgetting the selected
-set or ambient sound. The three groups — **Keyboard sounds**, **Ambient sounds**, and
-**Video desktop** — keep only the current selection, off/switch actions, five
-recent choices, and **Browse all / Controls / Library** at the first level.
-Keyboard sets are grouped by character; ambient sounds split into Klonk's
-included collection and your library; videos split into Apple Aerials and your
-clips. Recent choices persist across restarts. Use **Open Klonk Studio…** at the
-bottom of the menu when you want to search, audition, compare, or remix the full
-collection.
+Reload Hammerspoon. A keyboard icon appears in the menu bar. Choose **Settings…**
+for the graphical settings window:
+
+- **Keyboard and mouse sounds:** turn input sounds on, light the **Keys**,
+  **Clicks**, and **Scroll** chips you want, choose a set, and adjust volume.
+  **Clicks and scroll** can use a different set from the keys (choosing one plays
+  a few clicks); performed sets play only from typing, so with one selected,
+  clicks borrow your most recent regular set unless you pick one.
+  Choosing a set or releasing the volume slider auditions it; **Try sound** plays
+  a short typing-and-clicking phrase. **More options** holds category/search
+  filters, recent choices, and library actions.
+- **Live desktop:** turn animation on, choose a clip from a searchable thumbnail
+  gallery, and set its playback speed. **More options** holds rotation, shuffle,
+  battery pause, and Apple Aerial sync.
+- **Ambient sound:** turn background audio on, choose a soundscape, preview it,
+  and adjust its independent volume. Library and search options expand inline.
+- **Presenter mode:** its own card with a main switch; the **Shortcuts and
+  special keys only** chip appears when it is on.
+- **Tools:** Klonk Studio, Apple Aerial downloads, and your media library folders.
+
+One on/off language runs through the window: a card's switch turns a feature on
+or off, and a lit chip is an option that is on.
+
+Changes apply immediately. Turning a feature off remembers its choice for next
+time. **Mute all sounds** stops keyboard, mouse, ambient audio, and previews while
+preserving each feature's settings; live desktops continue. When muted, preview
+buttons explicitly offer **Unmute and try**, which unmutes all audio and plays
+the sample. Only one preview plays at a time; **Stop preview** or closing Settings
+ends it. Ambient playback resumes after previewing.
+
+The menu bar keeps direct actions for mute, desktop pause/resume, Presenter mode,
+Settings, and Tools. The settings window is bundled with the Spoon and needs no
+server. Desktop thumbnails use `ffmpeg` when available (`brew install ffmpeg`);
+without it, the labeled desktop picker still works. Thumbnails are static and
+loaded on demand. With macOS **Reduce Motion** enabled, desktop animation pauses
+on a still frame and automatic rotation pauses too.
 
 macOS will ask to grant Hammerspoon **Accessibility** permission (needed to hear
 keystrokes); klonk only *listens* — it never intercepts or alters your typing.
 
 ## Presenter mode
 
-Choose **Presenter mode → Start** in the Klonk menu, or bind
+Choose **Start Presenter mode** in the Klonk menu, switch it on in **Settings**, or bind
 `togglePresenter`, when sharing or recording your desktop. Klonk shows recent
 key presses in a centered HUD, preserving the character actually produced
 (`a` versus `A`), and flashes a translucent neutral-gray halo around clicks. The overlays
@@ -148,8 +191,8 @@ Special keys held together appear as one evolving chord—`⌘+⌥`,
 even when their physical key-down times overlap during fast typing, so Klonk
 never turns normal letter sequences into `a+s`.
 
-Under **Presenter mode → Keys shown**, choose **All keys** or **Special keys
-only**. The latter keeps navigation, editing keys, function keys, modifiers,
+On the **Presenter mode** card in Settings, light **Shortcuts and special keys
+only**. This keeps navigation, editing keys, function keys, modifiers,
 and keyboard shortcuts visible while suppressing ordinary typed characters.
 Klonk remembers this filter, but not whether presenter mode itself is running.
 
@@ -183,10 +226,174 @@ rather than putting every recording into one oversized “samples” bucket:
 | Family | Sets | Character |
 |---|---|---|
 | Recorded keyboards | Cherry MX Black/Blue/Brown/Red, Everglide Crystal Purple/Oreo, Topre Purple Hybrid | real press **and release** recordings, including ABS/PBT variants |
-| Percussive objects | `ping-pong` `tennis` | recorded table-tennis bounces and tennis-ball impacts |
-| Machines & mechanisms | `thock` `crystal` `telegraph` `console` | contact, glass, sounder actions, and chunky console blips |
-| Musical instruments | `vibraphone` `kalimba` `harpsichord` `jazzy` | minor-pentatonic notes, so random keypresses improvise a melody |
-| Playful effects | `calligraph` `lcars` `pingpong` `spark` `splash` | more strongly themed input-sound worlds |
+| Interactive moods | performed: `live-chant` `techno-build` `orchestra-build` `film-score` `the-quest` `salon` `khoomei`; scenes: `harpsichord` `hard-drive-music-box` `bagpipe` `jazz-piano` `wurlitzer` `vibraphone` `kalimba` `slap-bass` `schmoove-guitar`; per key: `gregorian` | music that morphs and changes with your keyboard motion; performed sets and scenes follow your phrasing (tempo, held keys, a payoff on period or Return) |
+| Fun sounds | `thock` `telegraph` `ping-pong` `tennis` (bundled); `scratchy-quill` `star-voyage` `spark` `splash` (personal library) | themed input-sound worlds: creamy synthesized contact, a recorded telegraph sounder, recorded table-tennis and tennis impacts |
+
+`console` and `crystal` were retired in October 2026; `calligraph` is now
+`scratchy-quill`, `jazzy` became `jazz-piano`, and the duplicate personal
+`pingpong` folded into `ping-pong`. Saved selections follow the renames.
+
+### Performed sets: `live-chant`, `techno-build`, `orchestra-build`, `film-score`, `the-quest`, `salon`, `khoomei`
+
+Every performer page loads `performer/output.js` first: one shared output stage
+(a per-mood loudness trim, a limiter, and a soft clip) between the page's mix and
+the speaker, so every mood plays at about the same loudness and none can clip or
+overdrive speakers at full volume. `tests/loudness_moods.lua` meters each mood's
+real output silently inside Hammerspoon and flags any that peak above -1 dBFS;
+the trims in `output.js` are set from its report.
+
+Most sets map one keystroke to one sound. A *performed* set instead treats a
+sentence as a musical phrase. `live-chant` sings real Gregorian chant (Dies irae,
+Kyrie XI, Veni Creator, Requiem aeternam, Viderunt omnes):
+
+| You | The schola |
+|---|---|
+| type | sings the next syllable; a neume flows at your tempo |
+| type faster or slower | follows your tempo |
+| hold keys | sustains the note; letting go releases it into the abbey reverb |
+| comma | breathes |
+| Backspace | sings the previous syllable again |
+| period or Return | sings the phrase's cadence onto the final, an organum fifth beneath |
+
+**Write your own groove.** With `techno-build` selected, the Keyboard and mouse
+tab shows a **Groove pattern** editor: one bar per line in a Tidal-style
+mini-notation, each line prefixed with the keystrokes that unlock it.
+
+```
+0  : bd*4                       # four on the floor from the first keystroke
+4  : [~ oh]*4                   # off-beat open hats at four keystrokes
+10 : ~ cp ~ cp                  # claps on two and four
+14 : bd(3,8) cb?*8              # a Euclidean kick, sometimes cowbell
+18 : [~ a1 a1 a1] [~ a1 <a1 c2> a1] [~ a1 a1 a1] [~ a1 a2 a1]
+```
+
+Supported: sequences, `~` rests, `[groups]`, `x*n`, `x!n`, `<alternation>` per
+bar, `x?` sometimes, Euclidean `x(k,n,rotation)`, sounds `bd sd cp hh oh rim cb
+sh`, and bass notes (`a1`, `cs2`, `bb1`). Errors show as you type; **Apply**
+takes over at the next bar. Your pattern is saved to
+`~/Music/Klonk/patterns/techno-build.txt`; **Reset** returns to the bundled
+`pattern.txt`. The parser (`performer/mini.js`) is Klonk's own clean-room subset;
+Strudel, the JavaScript port of TidalCycles, is AGPL and is not included.
+
+`orchestra-build` builds a phrase the same way with a sampled orchestra: each
+keystroke plucks a pizzicato note of the current chord over a string pad, the
+harmony walks D minor to the dominant (A), cellos, horns, and brass join as the
+sentence grows, and at full strength keystrokes roll the timpani. Holding keys
+swells it, a comma breathes, Backspace steps back a chord, and period or Return
+lands the cadence with timpani, bass drum, and crash, in D major if you built to
+the dominant. Notes are FluidSynth renders of GeneralUser GS
+(`python3 tools/build_orchestra.py`), repitched from a three-semitone grid.
+
+`film-score` builds an action-film cue around one theme, original to Klonk: a horn
+call that climbs D-A-D, sighs down over B-flat, and answers itself a step higher.
+The first keystroke starts the pulse (low strings in sixteenths with 3-3-2 accents
+over a D minor pedal). Sections then join on half-phrases, one at a time: the horns
+state the theme; the strings answer it an octave up, marked by one braam; the tutti
+adds choir, low brass, snare and tom fills; and a long sentence earns the lift, a snare
+roll and riser into the whole score a whole step higher, with the second braam.
+Typing speed sets the tempo (112-132 BPM), held keys crescendo, a comma is the
+trailer gap (a silent bar), and Backspace is a reverse-cymbal whoosh. Return stops
+everything dead and, a beat later, lands the trailer cadence: B-flat, C, D major,
+short-short-long, with the whole orchestra, a sub boom and a growl. A period is one
+D minor hit, the end of a line rather than the film. Every note starts a few
+milliseconds late and a little uneven, as players do. Its sequencer and sampler run
+in an AudioWorklet; the notes are GeneralUser GS renders
+(`python3 tools/build_orchestra.py cinematic`).
+
+`the-quest` (formerly war-chant) is a video-game quest theme: a synthesized growling choir in the kargyraa style: each
+keystroke chants a syllable (HA, O, HA, OM) snapped to the ritual's sixteenth-note
+grid, over a growled drone an octave below the voices; war drums, an answering
+higher choir, metal hits and a frenzy join as the sentence grows, a comma
+breathes, Backspace swells the growl, and period or Return is the SHOUT. The
+growl is period doubling: every other glottal pulse is weaker, which puts a
+subharmonic an octave down. No samples.
+
+`salon` is chamber music in a small, warm room, Versailles or Vienna: each
+keystroke plays the next note of a real theme, alternating the Minuet in G
+(BWV Anh. 114) and the opening of Mozart's *Eine kleine Nachtmusik*. The cello
+takes the bass at each bar; the viola, a second violin a third below, and the
+harpsichord continuo join as the sentence grows. Typing speed shapes the
+phrasing, a held key trills, a comma lifts the bow, Backspace replays a note, and
+period or Return plays a galant cadence: a trill over the dominant seventh
+resolving home. The harpsichord is Klonk's physical model tuned to A440
+(`python3 tools/build_orchestra.py chamber`).
+
+`khoomei` is Mongolian and Tuvan throat singing on the open steppe, from real
+recordings: each keystroke plays the next note of sygyt (the whistled overtone
+melody above a drone) in the order the singer sang it, over a soft drone tuned to
+his own fundamental. A galloping hoof rhythm, a morin khuur bowing a fifth drone,
+and deep kargyraa recordings join as the sentence grows; period or Return plays
+the singer's own ending. Recordings: Alfonso Perez, recorded at MTG (Universitat
+Pompeu Fabra), uploaded to Freesound by Bram, packs
+[Alfonso - Sygyt](https://freesound.org/people/Bram/packs/1190/) and
+[Alfonso - Kargyraa](https://freesound.org/people/Bram/packs/1189/), CC BY 4.0;
+sliced into 375 notes by `python3 tools/build_khoomei.py`. Without the recordings
+the performer synthesizes the sygyt whistle: one bright glottal source through a
+vowel body plus a very narrow resonance parked on a single harmonic of the drone.
+
+### Instrument scenes
+
+The instrument sets are performed too: each is a scene with a style, played one
+phrase at a time by `performer/scene.js` from data in `performer/scenes.js`. Keys
+perform the scene; mouse clicks still use the set's own sounds.
+
+| Set | Scene | What your typing plays |
+|---|---|---|
+| `harpsichord` | Prelude | J. S. Bach, Prelude in C (BWV 846), arpeggio by arpeggio, on Klonk's harpsichord model |
+| `hard-drive-music-box` | Lullaby | Brahms' Wiegenlied in A-flat on the box's own recorded comb; Return winds it down |
+| `bagpipe` | Highland | Scotland the Brave (traditional; The Session setting 31611, in G) over the drones, pipe-band drums joining |
+| `jazz-piano` | After Hours | generated bebop lines over ii-V-I, walking upright bass, comping, ride |
+| `wurlitzer` | Soul Kitchen | generated gospel-soul lines over a minor vamp, an amen cadence |
+| `vibraphone` | Late Lounge | generated vibes lines, upright bass, soft rolled chords |
+| `kalimba` | Mbira Circle | interlocking cyclic figures, hosho shaker, an echoing second part |
+| `slap-bass` | Funk Groove | a written slap riff (pops and ghost notes), hats, backbeat, kick |
+| `schmoove-guitar` | Rio | bossa-nova comping: thumb on root and fifth, syncopated chords |
+
+Generated lines are seeded per scene and bar, so they are varied but reproducible.
+`python3 tools/build_scenes.py` renders each scene's note bank. To check that every
+mood actually sounds, run `tests/live_moods.lua` inside Hammerspoon (see its header).
+
+They live with the instrument sets under **Interactive moods**: music that morphs
+and changes with your keyboard motion. (Older `musical` and `performed` category
+tags read as Interactive moods.) `techno-build` treats a sentence as a build and Return as the
+drop: the first keystroke starts the kick, more keystrokes add off-beat hats,
+claps and sixteenths, a rolling bass, then a snare roll and riser; typing speed
+sets the tempo (118-140 BPM); held keys open the bass filter; a comma drops the
+kick for a bar; Backspace scratches; period or Return lands POW on a fresh
+downbeat and two bars of the full groove. Everything is synthesized inside an
+AudioWorklet that counts samples, because hidden web pages throttle timers to
+about one tick per second.
+
+A set folder with a one-word `performer` file (`gregorian`, `techno`) is played by
+a hidden Web Audio page (`Klonk.spoon/performer/<kind>.html`) instead of WAV pools. Its voices are VocalSet
+recordings and its chant encodings come from
+[Synth_Gregorian](https://github.com/BrendanJamesLynskey/Synth_Gregorian) (MIT);
+`python3 tools/build_performer.py` rebuilds the assets from a pinned commit. See
+`Klonk.spoon/performer/CREDITS.md`. Measured latency: about 4 ms to reach the page
+plus 28 ms of audio output.
+
+### Musical sets — where each sound comes from
+
+Every musical set says in its `SOURCE.txt` whether it is synthesized or sampled,
+and credits any recording it uses.
+
+| Set | Source | Notes |
+|---|---|---|
+| `vibraphone` | synthesized (sine partials, tremolo) | minor pentatonic |
+| `kalimba` | synthesized (inharmonic tine partials) | minor pentatonic |
+| `harpsichord` | synthesized physical model after Välimäki, Penttinen, Laurson, Erkut, and Knif, [“Model-based sound synthesis of the harpsichord”](https://www.akustinenseura.fi/wp-content/uploads/2013/08/o02.pdf) (BNAM 2004) | per-key loop gain and loss filter, 12–50% plucking point, two 8′ choirs and a 4′, an 8-branch soundboard network, a damper sound on key-up, rolled chord on Return; tuned to A4 = 415 Hz |
+| `jazz-piano` | **sampled**: [Open Samples](https://github.com/pumodi/open-samples) “Dusty Upright Piano” and “Bohemian Upright Bass” | D dorian notes, sixths, a crushed blue note, a rootless Dm9 on Space, G13→Cmaj9 on Return; mouse clicks walk the upright bass |
+| `wurlitzer` | **sampled**: Open Samples “Wurlitzer 200A Electric Piano” raw reeds at four dynamics | mellow mp takes for keys in C minor pentatonic, a rootless Cm9 on Space, a hard-hit Bb13 bark into Cm9 on Return, low reeds on click |
+| `hard-drive-music-box` | **sampled**: Open Samples “Hard Drive Music Box”, a paper-tape music box gaffer-taped to an empty hard drive case | Ab major, both recorded takes of every note alternate, played as recorded (its comb runs 15–45 cents sharp); silent on release |
+| `bagpipe` | **sampled**: [FreePats “Bagpipe in G”](https://github.com/freepats/bagpipe), recorded by Gilles Sadowski, CC0 | chanter notes on both drones with a high-G gracenote, a birl on Backspace, a run to a held high G on Return |
+| `gregorian` | rendered with FluidSynth from [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) choir voices, in a cathedral reverb | D dorian chant; a held organum drone (D and A in fifths) from the first key until Return, which sings a melisma to an Amen |
+| `slap-bass` | rendered with FluidSynth from GeneralUser GS slap basses | thumb slaps in E minor pentatonic, popped octaves, ghost notes on key release, a lick ending in a big octave on Return |
+| `schmoove-guitar` | synthesized Karplus-Strong plucked strings | hollow-body neck-pickup tone, palm-muted m9/13/maj9/7♭13 comping stabs, a slow Cmaj9 on Return |
+
+Regenerate one set without touching the others:
+`python3 tools/generate.py Klonk.spoon/sounds --only=harpsichord`. The sampled
+set downloads its recordings once, pinned to an Open Samples commit, into
+`~/.cache/klonk/open-samples`.
 
 Saved Studio remixes appear first under **Environments**. Older personal sets
 tagged `samples` are read as **Recorded keyboards** automatically.
@@ -216,7 +423,7 @@ console blips? `tools/make_set.py` slices, trims, normalizes, and maps them onto
 the whole convention (keys **and** mouse voices) in one shot:
 
 ```sh
-python3 tools/make_set.py ~/sounds/paper calligraph    # -> ~/Music/Klonk/keyboard/calligraph
+python3 tools/make_set.py ~/sounds/paper scratchy-quill    # -> ~/Music/Klonk/keyboard/scratchy-quill
 python3 tools/make_set.py ~/sounds/console console-ui --enter "Working.m4a" --space "Door Chime.aif"
 ```
 
@@ -281,7 +488,7 @@ localhost.
 
 The studio can also **edit**: click any key, drag its volume, or hit
 "swap sound…" to assign that role a sound from *any* set in your inventory —
-crystal's Return ding on a browns keyboard, console's scroll ticks, the
+the harpsichord's rolled Return on a browns keyboard, LCARS scroll glides, the
 telegraph clack for right-click. Everything previews live in the page (nothing
 is written while you experiment), and saving compiles the remix into a plain
 set folder in `~/Music/Klonk/keyboard/<name>/`:
@@ -300,7 +507,7 @@ set folder in `~/Music/Klonk/keyboard/<name>/`:
 ## Ambient sounds
 
 klonk can also play a **looping background soundscape** under your typing — pick
-one from the menu-bar **Ambient sounds** submenu (with its own volume). It now
+one from the **Ambient sound** settings card (with its own volume). It now
 ships all ten ambience tracks from
 [Mechvibes DX](https://github.com/hainguyents13/mechvibes-dx/tree/main/assets/sounds):
 `chatter`, `cricket`, `fire`, `forest`, `ocean`, `rain`, `river`, `stream`,
@@ -382,6 +589,10 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
   `down1.wav` / `space.wav` convention and play identically. The contract is the
   filesystem, not the code, which is why adding real samples took zero engine
   changes.
+- **Held sounds.** A set may add `sustain.wav`, a seamless loop the engine holds
+  under the playing: the first key or click starts it, more input keeps it
+  going, Return ends it (the set's `enter.wav` carries the closing flourish),
+  and six seconds of quiet fade it out. The bagpipe uses it for its drones.
 - **Zero idle cost.** A set is preloaded into `hs.sound` objects when selected,
   so a keystroke is a table lookup + play with no disk I/O. The `eventtap` is
   observe-only (`return false`) — it hears keys, never swallows them.
@@ -389,13 +600,8 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
   event tap. Muting sounds disables audio work without blinding presenter mode;
   turning presenter mode off removes its HUD and any in-flight click rings.
 - **Return is per-set.** Each set's Return sound lives in its own `enter.wav`:
-  Console uses a drum-pad action without a ding, Telegraph uses a recorded
-  physical action, and musical sets can run a glissando — no universal overlay.
-- **Mechanical vs. digital.** The recorded `telegraph` and synthesized `console`
-  sets use distinct source material while sharing a tactile workstation role.
-  Console's generator uses a broadband
-  impact + a low body tone that *sags in pitch* as it decays + soft saturation —
-  the three things clean sine partials can't fake.
+  Telegraph uses a recorded physical action, the harpsichord rolls a chord, and
+  LCARS plays its recorded "Working" sound — no universal overlay.
 - **Voices layer, adaptively.** A single `hs.sound` is monophonic — retriggering
   it cuts its own tail — so each sound is loaded as a *bank* of copies the engine
   round-robins through, letting fast keystrokes ring out and overlap into a wash.
@@ -422,8 +628,32 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
 
 - **Code** (`Klonk.spoon/init.lua`, `tools/`): MIT — see [LICENSE](LICENSE).
 - **Synthesized bundled sounds** (`Klonk.spoon/sounds/`): originals released
-  **CC0** (public domain) — use them anywhere. Recorded sets carry a `SOURCE.txt`
-  beside their audio.
+  **CC0** (public domain) — use them anywhere. Recorded and sampled sets carry a
+  `SOURCE.txt` beside their audio.
+- **Sampled musical sets** (`Klonk.spoon/sounds/jazz-piano/`, `wurlitzer/`,
+  `hard-drive-music-box/`): derived from
+  [Open Samples](https://github.com/pumodi/open-samples) recordings (“Dusty
+  Upright Piano”, “Bohemian Upright Bass”, “Wurlitzer 200A Electric Piano”,
+  “Hard Drive Music Box”) by Jeffrey Brice and contributors,
+  under the Open Samples Permissive Use Public License v2: royalty free for sound
+  playback, redistributable non-commercially, and not to be resold or repackaged
+  for sale. These sounds are not CC0.
+- **Bagpipe** (`Klonk.spoon/sounds/bagpipe/`): derived from
+  [FreePats “Bagpipe in G”](https://github.com/freepats/bagpipe), recorded in 2020
+  by Gilles Sadowski on a bagpipe designed by Rémy Dubois and built by Olle Geris,
+  CC0 public domain.
+- **General MIDI sets** (`gregorian/`, `slap-bass/`): rendered offline with
+  [FluidSynth](https://www.fluidsynth.org) from
+  [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) v2.0.3 by
+  S. Christian Collins, whose license permits use in software projects. The
+  generator fetches the bank once (pinned commit, SHA-256 checked) into
+  `~/.cache/klonk/soundfonts/`; rendering needs `brew install fluid-synth`.
+- **Khoomei recordings** (`Klonk.spoon/performer/khoomei-samples.js`): throat
+  singing by Alfonso Perez, recorded at MTG (Universitat Pompeu Fabra), uploaded to
+  Freesound by Bram (packs 1189 and 1190), licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Sliced and re-encoded.
+- **Harpsichord model**: parameters from Välimäki et al., “Model-based sound
+  synthesis of the harpsichord,” Joint Baltic-Nordic Acoustics Meeting 2004.
 - **Ambient collection** (`Klonk.spoon/ambient/`): the `synth-*` WAVs are Klonk
   originals released as **CC0**. The other ten tracks come unchanged from
   [Mechvibes DX](https://github.com/hainguyents13/mechvibes-dx/tree/main/assets/sounds),
@@ -448,3 +678,23 @@ python3 tools/build_gallery.py                 # rebuild the browser demo
   [bigsoundbank.com](https://bigsoundbank.com)).
 
 Built with [Hammerspoon](https://www.hammerspoon.org).
+
+## Settings verification
+
+Run `lua tests/settings_test.lua`, `lua tests/presenter_test.lua`, and
+`lua tests/aerials_test.lua` (Aerial catalog, plan, sync, and download) for the
+state-contract and Presenter regressions. `tests/settings_live.js` exercises the
+actual WKWebView controls, including silent previews, and restores the starting
+preferences in a `finally` block. Run it with the settings window open:
+
+```lua
+local f = assert(io.open("/path/to/klonk/tests/settings_live.js"))
+local script = f:read("*a"); f:close()
+spoon.Klonk._settingsView:evaluateJavaScript(script)
+-- After completion, inspect window.klonkTestResult via evaluateJavaScript.
+```
+
+The live check needs populated sound and desktop libraries. It temporarily changes
+settings; run it when nobody is interacting with the window. Settings operations
+emit start/finish events with elapsed time and success/failure classification to
+the Hammerspoon Console. No typed content is recorded.

@@ -1,0 +1,14 @@
+Set 'salon' is performed, not sampled per key: Klonk forwards your typing to
+performer/chamber.html, a string quartet and harpsichord in a small, warm room.
+
+Each keystroke plays the next note of a real theme, phrase by phrase: the Minuet in G
+(BWV Anh. 114, attributed to Christian Petzold) for Versailles, the opening of Mozart's
+Eine kleine Nachtmusik (K. 525) for Vienna; both are public domain. The cello takes the
+bass at each bar; the viola, a second violin a third below, and the harpsichord continuo
+join as the sentence grows. Typing speed shapes the phrasing; a held key trills; a comma
+lifts the bow; Backspace replays a note; a period or Return plays a galant cadence, a
+trill over the dominant seventh resolving home.
+
+Strings rendered by tools/build_orchestra.py (chamber bank) with FluidSynth from
+GeneralUser GS v2.0.3 by S. Christian Collins. The harpsichord is Klonk's physical model
+after Valimaki et al. (2004), tuned to A440 for the ensemble.

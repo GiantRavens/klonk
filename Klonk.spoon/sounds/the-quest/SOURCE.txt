@@ -1,0 +1,10 @@
+Set 'the-quest' (formerly war-chant) is performed, not sampled per key: Klonk forwards your typing to
+performer/warchant.html, a synthesized throat-singing choir in an AudioWorklet.
+
+A video-game quest theme in the style of growled kargyraa war chants. The first
+keystroke starts a low growled drone; each keystroke chants a syllable (HA, O, HA, OM)
+snapped to the ritual's sixteenth-note grid; war drums, an answering higher choir, metal
+hits and a frenzy join as the sentence grows; typing speed sets the tempo; held keys hold
+the syllable; a comma breathes; Backspace swells the undertone; a period or Return is the
+SHOUT, then silence. Every sound is synthesized (period-doubled glottal pulses through
+male formant filters). No samples.

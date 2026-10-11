@@ -1,0 +1,15 @@
+# techno-build groove: one bar per line, Tidal-style mini-notation.
+# The number is how many keystrokes into a sentence the line joins.
+#
+#   bd*4        four kicks          ~        a rest
+#   [~ oh]*4    off-beat open hats  <a b>    alternate each bar
+#   bd(3,8)     Euclidean rhythm    hh?      sometimes
+#   bd!3        three copies        a1 c2    bass notes
+#   sounds: bd sd cp hh oh rim cb sh
+#
+# Period or Return drops into two bars of every line at once.
+0  : bd*4
+4  : [~ oh]*4
+10 : ~ cp ~ cp
+10 : [~ hh]*8
+18 : [~ a1 a1 a1] [~ a1 <a1 c2> a1] [~ a1 a1 a1] [~ a1 a2 a1]

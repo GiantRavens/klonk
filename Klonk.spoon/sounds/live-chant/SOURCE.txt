@@ -1,0 +1,11 @@
+Set 'live-chant' is performed, not sampled per key: Klonk forwards your typing to
+performer/gregorian.html, a live Web Audio page.
+
+Each keystroke sings the next syllable of real Gregorian chant (Dies irae, Kyrie XI,
+Veni Creator, Requiem aeternam, Viderunt omnes, in turn); typing speed sets the tempo;
+holding keys sustains the voice; a comma breathes; Backspace re-sings the previous
+syllable; a period or Return sings the phrase's cadence onto the final with an organum
+fifth beneath, and the next phrase begins with your next keystroke.
+
+Voices and repertoire come from Synth_Gregorian (Brendan James Lynskey, MIT); the voices
+are VocalSet recordings (CC BY 4.0). See performer/CREDITS.md.

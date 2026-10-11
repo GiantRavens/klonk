@@ -1,0 +1,2 @@
+Set 'kalimba' synthesized by tools/generate.py: inharmonic tine partials (1, 2.76, 5.40) with a pluck transient, notes from C minor pentatonic.
+No samples. Released CC0.

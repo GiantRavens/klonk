@@ -37,7 +37,13 @@
       {
         "name": "bindHotkeys",
         "def": "Klonk:bindHotkeys(mapping)",
-        "doc": "Binds hotkeys. Keys: toggle, nextSet, prevSet.",
+        "doc": "Binds hotkeys. Keys: toggle, toggleMouse, togglePresenter, nextSet, prevSet, settings.",
+        "type": "Method"
+      },
+      {
+        "name": "showSettings",
+        "def": "Klonk:showSettings([section])",
+        "doc": "Opens the graphical settings window. Optional section: tools. Settings apply immediately and persist through the existing engine.",
         "type": "Method"
       }
     ],
@@ -46,7 +52,7 @@
     "Constructor": [],
     "Deprecated": [],
     "name": "Klonk",
-    "desc": "Mechanical keystroke sounds for macOS — any sound set is a folder of WAVs.",
+    "desc": "Mechanical keystroke sounds for macOS \u2014 any sound set is a folder of WAVs.",
     "doc": "Mechanical keystroke sounds for macOS, in any voice you like. A sound set is just a folder of WAVs, so synthesized sets, real recorded keyboards, and anything you drop in all play the same way. Each set can give Return its own flourish through enter.wav. Menu-bar controlled.",
     "items": []
   }

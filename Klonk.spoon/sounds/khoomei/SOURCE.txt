@@ -1,0 +1,16 @@
+Set 'khoomei' is performed, not sampled per key: Klonk forwards your typing to
+performer/khoomei.html, Mongolian and Tuvan throat singing on the open steppe.
+
+Each keystroke plays the next real sygyt note (the whistled overtone melody above a
+drone), in the order the singer sang them, over a soft drone tuned to his own
+fundamental. A galloping hoof rhythm, a morin khuur bowing a fifth drone, and deep
+kargyraa recordings join as the sentence grows. Typing speed sets the gallop; a held key
+lets the note ring; a comma breathes; Backspace sings the last note again; a period or
+Return plays the singer's own ending, the final note of a take.
+
+Recordings: throat singing by Alfonso Perez, recorded at MTG (Universitat Pompeu Fabra),
+uploaded to Freesound by Bram: packs "Alfonso - Sygyt" (freesound.org/people/Bram/packs/1190)
+and "Alfonso - Kargyraa" (freesound.org/people/Bram/packs/1189). Licensed CC BY 4.0
+(creativecommons.org/licenses/by/4.0). Sliced into notes by tools/build_khoomei.py from
+the public HQ previews, pinned by sound ID. Morin khuur, hooves and the drone bed are
+synthesized; without the recordings the performer synthesizes the sygyt whistle itself.

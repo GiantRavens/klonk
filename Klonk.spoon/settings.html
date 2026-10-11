@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
+<title>klonk settings</title>
+<style>
+:root{color-scheme:light dark;--bg:#f3f3f5;--card:#fff;--text:#202127;--secondary:#61636c;--line:#dedee4;--accent:#3564d9;--tint:#edf2ff;--field:#f8f8fa;--warning:#775015}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}button,input,select{font:inherit}button,select,input[type=search]{border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--text);padding:7px 10px}button{cursor:pointer}button:hover{background:var(--field)}button:disabled,select:disabled{opacity:.5;cursor:default}button.primary{background:var(--accent);color:white;border-color:var(--accent)}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}input[type=range],input[type=checkbox]{accent-color:var(--accent)}input[type=range]{width:100%;min-width:90px}input[type=search]{width:100%}select{max-width:100%;min-width:0}p{margin:3px 0;color:var(--secondary)}h1{font-size:23px;letter-spacing:-.7px;margin:0}h2{font-size:17px;letter-spacing:-.3px;margin:0}h3{font-size:14px;margin:0}header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:38px 28px 0}.top{display:flex;align-items:center;justify-content:space-between;gap:16px}.brand p{font-size:12px}.global{display:flex;align-items:center;gap:12px}.tabs{display:flex;flex-wrap:wrap;column-gap:20px;margin-top:16px}.tabs .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--line)}.tabs .dot.on{background:var(--accent)}.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 2px;color:var(--secondary);font-weight:600}.tabs button[aria-selected=true]{border-color:var(--accent);color:var(--accent)}main{max-width:900px;padding:22px 28px 30px;margin:auto}.intro{margin-bottom:17px}.intro p{font-size:13px}.card{border:1px solid var(--line);border-radius:13px;background:var(--card);margin:0 0 16px;overflow:hidden}.card-head{display:flex;align-items:center;gap:14px;padding:18px 20px}.card-head .copy{flex:1;min-width:0}.card-head p{font-size:13px}.icon{width:38px;height:38px;border-radius:10px;background:var(--tint);color:var(--accent);display:grid;place-items:center;flex:none}.icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.toggle{display:flex;align-items:center;gap:8px;white-space:nowrap;color:var(--secondary);font-size:12px;cursor:pointer}.toggle input{appearance:none;width:34px;height:20px;border-radius:15px;background:#85858b;position:relative;margin:0;cursor:pointer}.toggle input:checked{background:var(--accent)}.toggle input:before{content:"";position:absolute;width:16px;height:16px;top:2px;left:2px;border-radius:50%;background:white;box-shadow:0 1px 3px #0003}.toggle input:checked:before{left:16px}.body{padding:0 20px 18px}.row{display:flex;align-items:center;gap:12px;margin:12px 0}.row>label:first-child,.row>.row-label{width:108px;flex:none;color:var(--secondary);font-size:13px}.row select{flex:1}.slider{display:flex;align-items:center;gap:12px;flex:1}.slider output{width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--secondary);font-size:12px}.chips{display:flex;flex-wrap:wrap;gap:8px;flex:1}.chip{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:6px 13px 6px 10px;background:var(--field);color:var(--secondary);font-size:13px}.chip svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.55}.chip[aria-pressed=true],.chip[aria-pressed=true]:hover{background:var(--tint);color:var(--accent);border-color:var(--accent);font-weight:600}.chip[aria-pressed=true] svg{opacity:1}details>.chips{margin:13px 0}#pattern{width:100%;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical;margin-top:8px}code{font:12px ui-monospace,Menlo,monospace}#pattern-errors{min-height:18px}details{border-top:1px solid var(--line);margin-top:15px;padding-top:11px}summary{cursor:pointer;color:var(--secondary);font-size:13px;width:fit-content}.check{display:flex;align-items:center;gap:8px;margin:13px 0}.check input{width:16px;height:16px}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.help{font-size:12px;color:var(--secondary);margin-top:6px}.gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.tile{padding:0;text-align:left;overflow:hidden;border:2px solid var(--line);border-radius:9px;background:var(--field)}.tile[aria-pressed=true]{border-color:var(--accent);background:var(--tint)}.thumb{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;background:var(--field);font-size:11px;color:var(--secondary);overflow:hidden}.thumb img{width:100%;height:100%;object-fit:cover}.tile-label{display:block;padding:7px 8px;font-size:12px;line-height:1.3;min-height:43px;overflow-wrap:anywhere}.tile[aria-pressed=true] .tile-label:before{content:"✓ ";color:var(--accent)}.browse{display:flex;align-items:center;gap:9px;margin:10px 0}.browse input{flex:1;min-width:60px}.browse select{width:145px}.pager{display:flex;align-items:center;justify-content:space-between;margin-top:10px;color:var(--secondary);font-size:12px}.pager .actions{margin:0}.banner{padding:10px 13px;border-radius:8px;background:var(--tint);font-size:13px;margin-bottom:16px}.empty{padding:12px;background:var(--field);border-radius:8px;color:var(--secondary);font-size:13px}.status{font-size:12px;color:var(--secondary);min-height:21px}.error{color:var(--warning)}.tool{padding:20px}.tool+.tool{border-top:1px solid var(--line)}.tool .row{margin-top:0}.tool h2{font-size:16px}.tool p{font-size:13px}.selected{display:block;margin-top:3px;font-size:12px;color:var(--secondary)}footer{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--secondary);padding-top:4px}[hidden]{display:none!important}
+progress{width:100%;height:8px;accent-color:var(--accent)}
+@media(prefers-color-scheme:dark){:root{--bg:#242528;--card:#303135;--text:#f0f0f4;--secondary:#b4b5c0;--line:#494a52;--accent:#8aafff;--tint:#343f55;--field:#38393e;--warning:#ffd18a}button.primary{color:#17233d}.toggle input:checked{background:#4679e6}}
+@media(prefers-contrast:more){:root{--line:#777;--secondary:#444}button,select{border-width:2px}}
+@media(prefers-color-scheme:dark) and (prefers-contrast:more){:root{--secondary:#ddd;--line:#aaa}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media(max-width:580px){header{padding:34px 16px 0}main{padding:16px}.card-head{padding:16px}.body{padding:0 16px 16px}.row{flex-wrap:wrap}.row>label:first-child,.row>.row-label{width:100%}.gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.brand p{display:none}.global{gap:5px}.icon{display:none}}
+</style>
+<!-- MINI -->
+</head>
+<body>
+<header>
+ <div class="top"><div class="brand"><h1>klonk</h1><p>Your Mac’s personal ambience station.</p></div><div class="global"><button id="stop-preview" hidden>Stop preview</button><button id="mute">Mute all sounds</button></div></div>
+ <div class="tabs" role="tablist" aria-label="Settings sections"><button id="tab-keyboard" role="tab" aria-selected="true" aria-controls="keyboard-panel"><span class="dot" id="dot-keyboard" aria-hidden="true"></span>Keyboard and mouse</button><button id="tab-presenter" role="tab" aria-selected="false" aria-controls="presenter-panel" tabindex="-1"><span class="dot" id="dot-presenter" aria-hidden="true"></span>Presenter</button><button id="tab-desktop" role="tab" aria-selected="false" aria-controls="desktop-panel" tabindex="-1"><span class="dot" id="dot-desktop" aria-hidden="true"></span>Live desktop</button><button id="tab-ambient" role="tab" aria-selected="false" aria-controls="ambient-panel" tabindex="-1"><span class="dot" id="dot-ambient" aria-hidden="true"></span>Ambient</button><button id="tab-tools" role="tab" aria-selected="false" aria-controls="tools" tabindex="-1">Tools</button></div>
+</header>
+<main>
+ <div id="muted-banner" class="banner" hidden>All sounds are muted. Your sound choices and volumes are saved. Live desktops keep playing.</div>
+ <div id="status" class="status" role="status" aria-live="polite">Connecting to Klonk…</div>
+ <div class="intro"><p>Choose what you want to hear and see. Changes apply immediately.</p></div>
+ <section id="keyboard-panel" role="tabpanel" aria-labelledby="tab-keyboard">
+  <section class="card" aria-labelledby="keyboard-title">
+   <div class="card-head"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h1m4 0h1m4 0h1M6 12h1m4 0h1m4 0h1M7 16h10"/></svg></div><div class="copy"><h2 id="keyboard-title">Keyboard and mouse sounds</h2><p>A little character with every keystroke, click, and scroll.</p><span id="keyboard-summary" class="selected"></span></div><label class="toggle"><span id="keyboard-on-label">Off</span><input id="keyboardOn" type="checkbox" role="switch" aria-label="Keyboard and mouse sounds" aria-controls="keyboard-body"></label></div>
+   <div id="keyboard-body" class="body" hidden>
+    <div class="row"><span class="row-label" id="channels-label">Play for</span><div class="chips" role="group" aria-labelledby="channels-label"><button class="chip" id="keys" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h1m4 0h1m4 0h1M6 12h1m4 0h1m4 0h1M7 16h10"/></svg>Keys</button><button class="chip" id="mouse" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v4"/></svg>Clicks</button><button class="chip" id="scroll" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4"/></svg>Scroll</button></div></div>
+    <div class="row"><label for="keyboard">Sound set</label><select id="keyboard"></select><button id="preview-keyboard">Try sound</button></div>
+    <div class="row"><label for="clickSet">Clicks and scroll</label><select id="clickSet"></select></div>
+    <p id="click-help" class="help" hidden></p>
+    <details id="pattern-editor" hidden><summary>Groove pattern</summary>
+     <p class="help">One bar per line, in Tidal-style mini-notation. The number is how many keystrokes into a sentence the line joins. Changes take over at the next bar.</p>
+     <textarea id="pattern" spellcheck="false" autocapitalize="off" autocomplete="off" rows="10" aria-label="Groove pattern" aria-describedby="pattern-errors"></textarea>
+     <div id="pattern-errors" class="help" role="status" aria-live="polite"></div>
+     <div class="actions"><button id="pattern-apply" class="primary">Apply pattern</button><button id="pattern-reset">Reset to default</button></div>
+     <p class="help"><code>bd*4</code> four kicks · <code>~</code> rest · <code>[a b]</code> squeeze into one step · <code>&lt;a b&gt;</code> alternate each bar · <code>bd(3,8)</code> Euclidean · <code>hh?</code> sometimes · <code>a1 c2</code> bass notes · sounds: <code>bd sd cp hh oh rim cb sh</code></p>
+    </details>
+    <div class="row"><label for="volume">Volume</label><div class="slider"><input id="volume" type="range" min="0" max="100" step="1"><output for="volume" id="volume-value"></output></div></div>
+    <details><summary>More options</summary><p class="help">Clicks and scroll use the same sound set. Sets that ship their own mouse sounds use those.</p><div class="browse"><input id="keyboard-search" type="search" aria-label="Find a keyboard sound" placeholder="Find a sound set…"><select id="keyboard-filter" aria-label="Keyboard sound category"><option value="">All categories</option><option value="recent">Recently used</option></select></div><div class="actions"><button data-folder="keyboard">Add sound sets…</button><button id="recordedSounds">Get recorded sounds…</button></div><p class="help">Add a folder of WAV sounds, then refresh the library.</p></details>
+   </div>
+   <div id="keyboard-empty" class="body" hidden><div class="empty">Add a sound set to get started.</div><div class="actions"><button data-folder="keyboard">Add sound sets…</button></div></div>
+  </section>
+ </section>
+ <section id="presenter-panel" role="tabpanel" aria-labelledby="tab-presenter" hidden>
+  <section class="card" aria-labelledby="presenter-title">
+   <div class="card-head"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 9h3m4 0h3M7 12h10"/></svg></div><div class="copy"><h2 id="presenter-title">Presenter mode</h2><p>Show your keystrokes and highlight clicks onscreen.</p></div><label class="toggle"><span id="presenter-label">Off</span><input id="presenter" type="checkbox" role="switch" aria-label="Presenter mode" aria-controls="presenter-options"></label></div>
+   <div id="presenter-options" class="body" hidden><div class="chips"><button class="chip" id="specialOnly" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h6v6H9zM9 9V6a3 3 0 1 0-3 3h3m6 0h3a3 3 0 1 0-3-3v3m0 6v3a3 3 0 1 0 3-3h-3m-6 0H6a3 3 0 1 0 3 3v-3"/></svg>Shortcuts and special keys only</button></div><p class="help">Presenter mode turns off when Klonk restarts. Ordinary typed characters are visible unless you choose special keys only.</p></div>
+  </section>
+ </section>
+ <section id="desktop-panel" role="tabpanel" aria-labelledby="tab-desktop" hidden>
+  <section class="card" aria-labelledby="desktop-title">
+   <div class="card-head"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m3 14 5-5 4 4 3-3 6 5M12 17v4m-4 0h8"/></svg></div><div class="copy"><h2 id="desktop-title">Live desktop</h2><p>A moving view behind your work.</p><span id="desktop-summary" class="selected"></span></div><label class="toggle"><span id="desktop-on-label">Off</span><input id="desktopOn" type="checkbox" role="switch" aria-label="Live desktop" aria-controls="desktop-body"></label></div>
+   <div id="desktop-body" class="body" hidden>
+    <div id="motion-banner" class="banner" hidden>Animation is paused because Reduce Motion is on in macOS.</div>
+    <div id="battery-banner" class="banner" hidden>Paused while your Mac is on battery power.</div>
+    <div class="row"><label for="desktop">Desktop</label><select id="desktop"></select></div>
+    <div class="browse"><input id="desktop-search" type="search" aria-label="Find a desktop" placeholder="Find a desktop…"><select id="desktop-filter" aria-label="Desktop collection"><option value="">All desktops</option><option value="recent">Recently used</option><option value="aerials">Apple Aerials</option><option value="personal">My clips</option></select></div>
+    <div id="gallery" class="gallery" aria-label="Choose a desktop"></div>
+    <div class="pager"><span id="page-label"></span><div class="actions"><button id="previous" aria-label="Previous desktops">Previous</button><button id="next" aria-label="Next desktops">Next</button></div></div>
+    <div class="row"><label for="speed">Playback speed</label><select id="speed"></select></div>
+    <p class="help">Very slow playback can look stepped. Choose Normal for clips already made in slow motion.</p>
+    <details><summary>More options</summary><div class="row"><label for="cadence">Change desktop</label><select id="cadence"></select><button id="shuffle">Shuffle now</button></div><div class="chips"><button class="chip" id="battery" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M6 10v4"/></svg>Pause on battery</button></div><div class="actions"><button data-folder="desktop">Add clips…</button><button data-sync>Sync Apple Aerials</button></div><p class="help">Add an MP4 or MOV clip, sync Aerials you activated in macOS Wallpaper settings, or download a whole Aerial collection from Tools.</p></details>
+   </div>
+   <div id="desktop-empty" class="body" hidden><div class="empty">Your desktop library is empty. Add a clip or bring in downloaded Apple Aerials.</div><div class="actions"><button data-folder="desktop">Add clips…</button><button data-sync>Sync Apple Aerials</button></div></div>
+  </section>
+ </section>
+ <section id="ambient-panel" role="tabpanel" aria-labelledby="tab-ambient" hidden>
+  <section class="card" aria-labelledby="ambient-title">
+   <div class="card-head"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10c3-6 5 6 9 0s6 6 9 0M3 16c3-6 5 6 9 0s6 6 9 0M3 4c3-6 5 6 9 0s6 6 9 0"/></svg></div><div class="copy"><h2 id="ambient-title">Ambient sound</h2><p>Set the mood with a background soundscape.</p><span id="ambient-summary" class="selected"></span></div><label class="toggle"><span id="ambient-on-label">Off</span><input id="ambientOn" type="checkbox" role="switch" aria-label="Ambient sound" aria-controls="ambient-body"></label></div>
+   <div id="ambient-body" class="body" hidden>
+    <div class="row"><label for="ambient">Soundscape</label><select id="ambient"></select><button id="preview-ambient">Try sound</button></div>
+    <div class="row"><label for="ambientVolume">Volume</label><div class="slider"><input id="ambientVolume" type="range" min="0" max="100" step="1"><output id="ambientVolume-value" for="ambientVolume"></output></div></div>
+    <details><summary>More options</summary><div class="browse"><input id="ambient-search" type="search" aria-label="Find an ambient sound" placeholder="Find a soundscape…"><select id="ambient-filter" aria-label="Ambient collection"><option value="">All sounds</option><option value="recent">Recently used</option><option value="bundled">Included</option><option value="personal">My library</option><option value="legacy">Other folders</option></select></div><div class="actions"><button data-folder="ambient">Add ambient sounds…</button></div><p class="help">Add a loopable audio file, then refresh the library.</p></details>
+   </div>
+   <div id="ambient-empty" class="body" hidden><div class="empty">Add a soundscape to get started.</div><div class="actions"><button data-folder="ambient">Add ambient sounds…</button></div></div>
+  </section>
+ </section>
+ <section id="tools" role="tabpanel" aria-labelledby="tab-tools" hidden>
+  <div class="intro"><p>Present, create, and grow your library.</p></div>
+  <div class="card">
+   <section class="tool"><h2>Klonk Studio</h2><p>Explore, audition, and remix your sound sets.</p><div class="actions"><button id="studio">Open Klonk Studio…</button></div></section>
+   <section class="tool"><h2>Your library</h2><p>Bring your own sounds and videos. Add files, then refresh to see them in Settings.</p><div class="actions"><button data-folder="keyboard">Keyboard sounds…</button><button data-folder="ambient">Ambient sounds…</button><button data-folder="desktop">Desktop clips…</button><button data-sync>Sync Apple Aerials</button></div></section>
+   <section class="tool" aria-labelledby="aerials-title"><h2 id="aerials-title">Apple Aerials</h2><p>Download a whole collection of Apple's aerial videos as live desktops, without activating each one in System Settings.</p><div class="row"><label for="aerial-collection">Collection</label><select id="aerial-collection"></select><button id="aerial-download" class="primary" disabled>Download</button><button id="aerial-cancel" hidden>Stop download</button></div><progress id="aerial-progress" max="1" value="0" hidden></progress><p id="aerial-plan" class="help" aria-live="polite">Choose a collection to see its size before downloading.</p></section>
+  </div>
+ </section>
+ <footer><span>Your choices are saved automatically.</span><button id="refresh">Refresh library</button></footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let state=null,catalog={sets:[],ambient:[],wallpapers:[],categories:[],speeds:[],cadences:[]},seq=0,page=0,galleryKey='',lastLibraryKey='';
+const pending=new Map(),thumbnails=new Map(),requested=new Set();
+const names={bundled:'Included with Klonk',personal:'My library',legacy:'Other folders'};
+function nice(name){return String(name||'').replace(/^Aerial - /,'').replace(/\.(mp4|mov|m4v)$/i,'').replace(/[-_]/g,' ')}
+// A sound set's name and description, from SET_LIST in init.lua.
+function setTitle(name){const item=(catalog?.sets||[]).find(i=>i.name===name);return item?.title||nice(name)}
+const setLabel=item=>(item.title||nice(item.name))+(item.about?' — '+item.about:'');
+function status(message,error=false){$('status').textContent=message;$('status').classList.toggle('error',error)}
+function send(action,value){
+ const id=++seq;
+ if(!window.webkit?.messageHandlers?.klonkSettings){status('Klonk is not connected. Close Settings and open it from the Klonk menu.',true);return}
+ if(action!=='thumbnail')pending.set(id,setTimeout(()=>{pending.delete(id);status('Klonk did not respond. Close Settings and try again.',true)},7000));
+ window.webkit.messageHandlers.klonkSettings.postMessage({id,action,value:value??null});
+}
+function option(value,label){const o=document.createElement('option');o.value=value;o.textContent=label;return o}
+function setValue(id,value){const el=$(id);if(document.activeElement!==el)el.value=String(value)}
+function setCheck(id,value){$(id).checked=!!value}
+// One on/off language: the card switch powers a feature; a lit chip is an option that is on.
+const CHIPS=['keys','mouse','scroll','battery','specialOnly'];
+function filtered(kind){
+ const items=kind==='keyboard'?catalog.sets:kind==='ambient'?catalog.ambient:catalog.wallpapers;
+ const q=$(kind+'-search').value.toLowerCase(),f=$(kind+'-filter').value;
+ const recentValue=state?.[kind==='keyboard'?'recentSets':kind==='ambient'?'recentAmbient':'recentWallpapers'];
+ const recents=Array.isArray(recentValue)?recentValue:[];
+ return items.filter(item=>(!f||(f==='recent'?recents.includes(item.name):item.category===f))&&(nice(item.title||item.name)+' '+(item.about||'')).toLowerCase().includes(q));
+}
+// Clicks can come from any set that has click sounds.
+// Group sets in the engine's category order, then by name.
+const byCategory=items=>{const rank=k=>{const i=catalog.categories.findIndex(c=>c.key===k);return i<0?99:i};return [...items].sort((a,b)=>rank(a.category)-rank(b.category)||(a.rank??1e9)-(b.rank??1e9)||a.name.localeCompare(b.name))};
+function populateClickSets(){
+ const select=$('clickSet'),groups=new Map();
+ select.replaceChildren(option('','Same as keys'));
+ for(const item of byCategory(catalog.sets)){
+  if(!item.clicks)continue;   // sets that play only from typing have no clicks
+  const label=catalog.categories.find(c=>c.key===item.category)?.label||item.category;
+  if(!groups.has(label)){const g=document.createElement('optgroup');g.label=label;groups.set(label,g);select.append(g)}
+  groups.get(label).append(option(item.name,setLabel(item)));
+ }
+}
+// Pattern editor: checked live with the same parser the groovebox runs.
+let patternDirty=false;
+function lintPattern(){
+ if(!window.Mini){$('pattern-errors').textContent='';return true}
+ const prog=Mini.parseProgram($('pattern').value);
+ const ok=!prog.errors.length;
+ $('pattern-errors').textContent=ok?prog.lines.length+' line'+(prog.lines.length===1?'':'s')+', ready.':prog.errors.map(e=>(e.line?'Line '+e.line+': ':'')+e.message).join(' · ');
+ $('pattern-errors').classList.toggle('error',!ok);$('pattern-apply').disabled=!ok;
+ return ok;
+}
+function populateSounds(kind){
+ const select=$(kind),items=kind==='keyboard'?byCategory(filtered(kind)):filtered(kind),current=state?.[kind]||'';
+ select.replaceChildren();
+ if(!items.length)select.append(option('','No matching sounds'));
+ const groups=new Map();
+ for(const item of items){
+  const label=kind==='keyboard'?(catalog.categories.find(c=>c.key===item.category)?.label||item.category):names[item.category];
+  if(!groups.has(label)){const g=document.createElement('optgroup');g.label=label;groups.set(label,g);select.append(g)}
+  groups.get(label).append(option(item.name,setLabel(item)));
+ }
+ // A filter must not silently change the selected sound.
+ if(current&&!items.some(i=>i.name===current))select.prepend(option(current,(kind==='keyboard'?setTitle(current):nice(current))+' — current choice'));
+ if(current)select.value=current;else select.value='';
+ select.disabled=!items.length;
+}
+function renderGallery(){
+ if(!state?.desktopOn)return;
+ const items=filtered('desktop'),pages=Math.max(1,Math.ceil(items.length/3));page=Math.min(page,pages-1);
+ const visible=items.slice(page*3,page*3+3);
+ for(const tile of $('gallery').children)if(tile.dataset.name)tile.setAttribute('aria-pressed',String(state.desktop===tile.dataset.name));
+ const key=JSON.stringify([visible,page,items.length]);
+ if(key===galleryKey)return;galleryKey=key;
+ $('gallery').replaceChildren();
+ if(!items.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='No matching desktops. Try another search or collection.';$('gallery').append(empty)}
+ for(const item of visible){
+  const button=document.createElement('button');button.className='tile';button.dataset.name=item.name;button.setAttribute('aria-pressed',String(state.desktop===item.name));button.setAttribute('aria-label',item.title);
+  const thumb=document.createElement('span');thumb.className='thumb';thumb.textContent='Loading preview…';
+  const label=document.createElement('span');label.className='tile-label';label.textContent=item.title;
+  button.append(thumb,label);button.onclick=()=>send('desktop',item.name);$('gallery').append(button);
+  if(thumbnails.has(item.name))paintThumbnail(item.name);else if(!requested.has(item.name)){requested.add(item.name);send('thumbnail',item.name)}
+ }
+ $('page-label').textContent=items.length?`${page*3+1}–${Math.min(page*3+3,items.length)} of ${items.length} desktops`:'No desktops';
+ $('previous').disabled=page===0;$('next').disabled=page>=pages-1;
+}
+function paintThumbnail(name){
+ for(const tile of $('gallery').children){
+  if(tile.dataset.name!==name)continue;
+  const thumb=tile.querySelector('.thumb'),data=thumbnails.get(name);thumb.replaceChildren();
+  if(data){const img=document.createElement('img');img.alt='';img.src=data;thumb.append(img)}else thumb.textContent='Preview unavailable';
+ }
+}
+function renderCatalog(){
+ for(const key of ['sets','ambient','wallpapers','categories','speeds','cadences'])if(!Array.isArray(catalog[key]))catalog[key]=[];
+ const filter=$('keyboard-filter'),selected=filter.value;
+ filter.replaceChildren(option('','All categories'),option('recent','Recently used'));
+ catalog.categories.filter(c=>catalog.sets.some(x=>x.category===c.key)).forEach(c=>filter.append(option(c.key,c.label)));filter.value=selected;
+ $('desktop').replaceChildren(...catalog.wallpapers.map(i=>option(i.name,i.title)));
+ $('speed').replaceChildren(...catalog.speeds.map(i=>option(i.rate,i.title)));
+ $('cadence').replaceChildren(...catalog.cadences.map(n=>option(n,n===0?'Keep this desktop':`Every ${n} minutes`)));
+ populateSounds('keyboard');populateSounds('ambient');populateClickSets();galleryKey='';lastLibraryKey='';
+ const selectedIndex=filtered('desktop').findIndex(item=>item.name===state?.desktop);page=Math.max(0,Math.floor(selectedIndex/3));
+}
+function render(){
+ if(!state)return;
+ $('mute').textContent=state.muted?'Unmute all sounds':'Mute all sounds';$('mute').classList.toggle('primary',state.muted);$('muted-banner').hidden=!state.muted;
+ $('stop-preview').hidden=!state.preview;
+ for(const kind of ['keyboard','desktop','ambient']){
+  const on=state[kind+'On'];setCheck(kind+'On',on);$('dot-'+kind).classList.toggle('on',!!on);$(kind+'-on-label').textContent=on?'On':'Off';$(kind+'-body').hidden=!on;
+  $(kind+'-summary').textContent=on?'':state[kind]?'Saved: '+(kind==='keyboard'?setTitle(state[kind]):nice(state[kind])):'Off — choose a '+(kind==='desktop'?'desktop':'sound')+' to get started';
+ }
+ const libraryKey=JSON.stringify([state.keyboard,state.ambient,state.recentSets,state.recentAmbient]);
+ if(libraryKey!==lastLibraryKey){populateSounds('keyboard');populateSounds('ambient');lastLibraryKey=libraryKey}
+ for(const id of ['desktop','speed','cadence','clickSet'])setValue(id,state[id]);
+ $('pattern-editor').hidden=!state.patternable;
+ if(state.patternable&&!patternDirty&&document.activeElement!==$('pattern')){$('pattern').value=state.patternText||'';lintPattern()}
+ $('pattern-reset').disabled=!state.patternCustom;
+ $('clickSet').disabled=!state.mouse&&!state.scroll;
+ const borrowed=!state.clickSet&&state.clickSource&&state.clickSource!==state.keyboard;
+ $('click-help').hidden=!borrowed;
+ if(borrowed)$('click-help').textContent=setTitle(state.keyboard)+' plays from your typing, so clicks and scroll use '+setTitle(state.clickSource)+'.';
+ setCheck('presenter',state.presenter);for(const id of CHIPS)$(id).setAttribute('aria-pressed',String(!!state[id]));
+ for(const id of ['volume','ambientVolume']){const value=Math.round(state[id]*100);setValue(id,value);$(id+'-value').value=value+'%';$(id).setAttribute('aria-valuetext',value+' percent')}
+ $('battery-banner').hidden=!state.batteryPaused;$('motion-banner').hidden=!state.reduceMotion;
+ $('desktop-empty').hidden=catalog.wallpapers.length>0;$('desktopOn').disabled=catalog.wallpapers.length===0;
+ $('ambient-empty').hidden=catalog.ambient.length>0;$('ambientOn').disabled=catalog.ambient.length===0;
+ $('keyboardOn').disabled=catalog.sets.length===0;$('keyboard-empty').hidden=catalog.sets.length>0;
+ $('presenter-label').textContent=state.presenter?'On':'Off';$('dot-presenter').classList.toggle('on',!!state.presenter);$('presenter-options').hidden=!state.presenter;
+ $('preview-keyboard').disabled=!state.keyboard;$('preview-ambient').disabled=!state.ambient;
+ for(const kind of ['keyboard','ambient'])$('preview-'+kind).textContent=state.preview===kind?'Stop preview':state.muted?'Unmute and try':'Try sound';
+ renderGallery();renderAerials();
+}
+function size(b){return b>=1e9?(b/1e9).toFixed(1)+' GB':Math.round((b||0)/1e6)+' MB'}
+function renderAerials(){
+ const cols=Array.isArray(catalog.aerialCollections)?catalog.aerialCollections:[];
+ const sel=$('aerial-collection'),a=state?.aerials||{},plan=a.plan,job=a.job,active=!!job?.active;
+ const key=JSON.stringify(cols);
+ if(sel.dataset.key!==key){const v=sel.value;sel.replaceChildren(option('','Choose a collection…'),...cols.map(c=>option(c.key,c.key+' — '+(c.missing?c.missing+' of '+c.total+' to download':'all '+c.total+' on this Mac'))));sel.dataset.key=key;sel.value=v}
+ if(active)setValue('aerial-collection',job.category);
+ sel.disabled=active;
+ const chosen=sel.value,planned=plan&&plan.category===chosen;
+ let text='Choose a collection to see its size before downloading.';
+ if(active){
+  const frac=job.currentTotal?Math.min(1,job.currentBytes/job.currentTotal):0;
+  $('aerial-progress').value=(job.done+frac)/Math.max(1,job.total);
+  text=(job.cancelled?'Stopping… ':'Downloading ')+job.current+' — '+(job.done+1)+' of '+job.total+(job.currentTotal?' ('+size(job.currentBytes)+' of '+size(job.currentTotal)+')':'')+'. You can close Settings; the download continues.';
+ }else if(planned&&!plan.ready)text='Checking Apple\'s catalog for sizes…';
+ else if(planned){
+  const have=plan.onMac?' '+plan.onMac+' already on this Mac.':'';
+  text=plan.verdict==='complete'?'All '+plan.onMac+' '+chosen+' Aerials are already on this Mac.'
+   :plan.verdict==='no-space'?plan.missing+' clips need '+size(plan.bytes)+' but only '+size(plan.free)+' is free. Klonk keeps 5 GB spare.'
+   :plan.verdict==='unreachable'?'Apple\'s aerial server did not answer. Try again later.'
+   :plan.missing+' clips to download, '+size(plan.bytes)+(plan.unknown?' plus '+plan.unknown+' of unknown size':'')+'.'+have+(plan.free?' '+size(plan.free)+' free.':'');
+ }else if(job)text='Last download: '+job.ok+' of '+job.total+' '+job.category+' clips saved'+(job.cancelled?' before you stopped it':'')+(job.failed.length?'. Not saved: '+job.failed.join(', '):'')+'.';
+ $('aerial-plan').textContent=text;
+ $('aerial-progress').hidden=!active;$('aerial-cancel').hidden=!active;$('aerial-download').hidden=active;
+ $('aerial-download').disabled=!(planned&&plan.ready&&plan.verdict==='ready');
+}
+const TABS=['keyboard','presenter','desktop','ambient','tools'];
+const panelOf=key=>key==='tools'?'tools':key+'-panel';
+function section(name){
+ if(name==='experiences'){try{name=localStorage.getItem('klonk.tab')||'keyboard'}catch(e){name='keyboard'}if(name==='tools')name='keyboard'}
+ if(!TABS.includes(name))name='keyboard';
+ try{localStorage.setItem('klonk.tab',name)}catch(e){}
+ for(const key of TABS){const selected=key===name;$(panelOf(key)).hidden=!selected;$('tab-'+key).setAttribute('aria-selected',String(selected));$('tab-'+key).tabIndex=selected?0:-1}
+}
+window.klonkReceive=message=>{
+ if(message.id&&pending.has(message.id)){clearTimeout(pending.get(message.id));pending.delete(message.id);status(message.error||message.notice||'Changes saved.',!!message.error)}
+ if(message.notice)status(message.notice);
+ if(message.thumbnail){thumbnails.set(message.thumbnail,message.image||null);paintThumbnail(message.thumbnail);return}
+ if(message.state){state=message.state;if(state.catalog){catalog=state.catalog;renderCatalog()}render()}
+ if(message.section)section(message.section);
+};
+for(const id of ['keyboardOn','desktopOn','ambientOn','presenter'])$(id).onchange=e=>send(id,e.target.checked);
+for(const id of CHIPS)$(id).onclick=()=>send(id,!state?.[id]);
+for(const id of ['keyboard','desktop','ambient','speed','cadence','clickSet'])$(id).onchange=e=>send(id,['speed','cadence'].includes(id)?Number(e.target.value):e.target.value);
+for(const id of ['volume','ambientVolume']){$(id).oninput=e=>{$(id+'-value').value=e.target.value+'%'};$(id).onchange=e=>send(id,Number(e.target.value)/100)}
+$('pattern').oninput=()=>{patternDirty=true;lintPattern()};
+$('pattern-apply').onclick=()=>{if(lintPattern()){patternDirty=false;send('pattern',$('pattern').value)}};
+$('pattern-reset').onclick=()=>{patternDirty=false;send('pattern','')};
+$('mute').onclick=()=>send('mute',!state?.muted);$('stop-preview').onclick=()=>send('stopPreview');
+for(const kind of ['keyboard','ambient'])$('preview-'+kind).onclick=()=>send(state.preview===kind?'stopPreview':(state.muted?'unmutePreview':'preview')+(kind==='keyboard'?'Keyboard':'Ambient'),state[kind]);
+for(const id of ['shuffle','studio','recordedSounds'])$(id).onclick=()=>send(id);
+$('aerial-collection').onchange=e=>{if(e.target.value)send('aerialPlan',e.target.value);renderAerials()};
+$('aerial-download').onclick=()=>send('downloadAerials',$('aerial-collection').value);
+$('aerial-cancel').onclick=()=>send('cancelAerials');
+$('refresh').onclick=()=>{requested.clear();thumbnails.clear();send('refresh')};
+document.querySelectorAll('[data-folder]').forEach(b=>b.onclick=()=>send('folder',b.dataset.folder));
+document.querySelectorAll('[data-sync]').forEach(b=>b.onclick=()=>send('syncAerials'));
+for(const kind of ['keyboard','ambient','desktop'])for(const suffix of ['search','filter'])$(kind+'-'+suffix).addEventListener(suffix==='search'?'input':'change',()=>{if(kind==='desktop'){page=0;galleryKey='';renderGallery()}else populateSounds(kind)});
+$('previous').onclick=()=>{page--;renderGallery()};$('next').onclick=()=>{page++;renderGallery()};
+for(const name of TABS){$('tab-'+name).onclick=()=>section(name);$('tab-'+name).onkeydown=e=>{const k=TABS.indexOf(name);const to={ArrowLeft:(k+TABS.length-1)%TABS.length,ArrowRight:(k+1)%TABS.length,Home:0,End:TABS.length-1}[e.key];if(to!==undefined){e.preventDefault();section(TABS[to]);$('tab-'+TABS[to]).focus()}}}
+send('ready');
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+Set 'vibraphone' synthesized by tools/generate.py: a near-harmonic metal-bar partial stack with slow tremolo, notes from C minor pentatonic.
+No samples. Released CC0.

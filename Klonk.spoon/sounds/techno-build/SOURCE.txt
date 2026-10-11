@@ -1,0 +1,9 @@
+Set 'techno-build' is performed, not sampled per key: Klonk forwards your typing to
+performer/techno.html, a live groovebox synthesized in an AudioWorklet. No samples.
+
+A sentence is a build and Return is the drop. The first keystroke starts the kick;
+more keystrokes add off-beat hats, claps and sixteenths, a rolling bass, then a snare
+roll and noise riser. Typing speed sets the tempo (118-140 BPM, eased in at each bar);
+holding keys opens the bass filter; a comma drops the kick for the next bar; Backspace
+scratches; a period or Return lands POW on a fresh downbeat, then two bars of the full
+groove. Stop typing and the layers fall away a bar at a time; four quiet bars end it.

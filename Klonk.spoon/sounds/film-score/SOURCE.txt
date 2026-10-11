@@ -1,0 +1,24 @@
+Set 'film-score' is performed, not sampled per key: Klonk forwards your typing to
+performer/cinematic.html, a live Web Audio page whose sequencer and sampler run in an
+AudioWorklet.
+
+film-score builds an action-film cue around one theme, original to Klonk: a horn
+call that climbs D-A-D, sighs down over B-flat, and answers itself a step higher.
+The first keystroke starts the pulse (low strings in sixteenths with 3-3-2 accents
+over a D minor pedal). Sections then join on half-phrases, one at a time: the horns
+state the theme; the strings answer it an octave up, marked by one braam; the tutti
+adds choir, low brass, snare and tom fills; and a long sentence earns the lift, a snare
+roll and riser into the whole score a whole step higher, with the second braam.
+Typing speed sets the tempo (112-132 BPM), held keys crescendo, a comma is the
+trailer gap (a silent bar), and Backspace is a reverse-cymbal whoosh. Return stops
+everything dead and, a beat later, lands the trailer cadence: B-flat, C, D major,
+short-short-long, with the whole orchestra, a sub boom and a growl. A period is one
+D minor hit, the end of a line rather than the film. Every note starts a few
+milliseconds late and a little uneven, as players do. Its sequencer and sampler run
+in an AudioWorklet; the notes are GeneralUser GS renders
+(python3 tools/build_orchestra.py cinematic).
+
+The theme and the cadence are written for Klonk; no film theme is quoted.
+
+Orchestra notes rendered by tools/build_orchestra.py (cinematic bank) with FluidSynth from
+GeneralUser GS v2.0.3 by S. Christian Collins, whose license permits use in software.

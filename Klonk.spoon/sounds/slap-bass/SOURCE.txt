@@ -1,0 +1,10 @@
+Set 'slap-bass' built by tools/instruments.py.
+
+Funk slap bass: thumb slaps in E minor pentatonic on keys, popped octaves, ghost notes
+on key release, slap-pop octave on Space, a hammer-on on Backspace, a lick ending in a
+big octave on Return.
+Rendered with FluidSynth from GeneralUser GS v2.0.3 by S. Christian Collins
+(github.com/mrbumpy409/GeneralUser-GS, commit 684543d5e5), which its license
+allows in software projects, private or commercial.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=slap-bass

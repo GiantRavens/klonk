@@ -1,0 +1,11 @@
+Set 'jazz-piano' built by tools/instruments.py.
+
+Sampled: keys and chords play the Open Samples 'Dusty Upright Piano' (A2-A5,
+repitched to the nearest note and tuned against each sample's measured pitch);
+mouse clicks walk a bass line on the 'Bohemian Upright Bass'. Key-up is a synthesized
+felt damper.
+Recorded samples from Open Samples (github.com/pumodi/open-samples, commit a7eab67887), Jeffrey Brice and contributors, under the Open Samples
+Permissive Use Public License v2: royalty free for sound playback; not to be resold or
+repackaged for sale. Klonk is free and redistributes these derived sounds non-commercially.
+
+Regenerate with: python3 tools/generate.py Klonk.spoon/sounds --only=jazz-piano
